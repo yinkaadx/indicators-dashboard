@@ -1,3 +1,4 @@
 *.xlsx
 *.csv
 *.db
+.streamlit/secrets.toml
