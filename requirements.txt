@@ -7,3 +7,4 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 yfinance==0.2.41
 plotly==5.23.0
+setuptools>=34.4.0
