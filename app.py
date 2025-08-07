@@ -208,8 +208,8 @@ FRED_MAP = {
     "Debt growth": "GFDEBTN",
     "Income growth": "A067RO1Q156NBEA",
     "Debt service": "TDSP",
-    "Military spending": "FSDTHG",  # Corrected to federal defense outlays
-    "Debt burden": "GFDEBTN"
+    "Military spending": "A063RC1Q027SBEA",  # National defense outlays
+    "Debt burden": "GFDEBTN"  # Total public debt
 }
 
 WB_MAP = {
@@ -241,8 +241,17 @@ def fetch_data(indicator):
                 if not series.empty:
                     data["current"] = series.iloc[-1]
                     data["previous"] = series.iloc[-2] if len(series) > 1 else np.nan
-            except Exception:
-                st.warning(f"FRED series {series_id} not found, trying alternative sources for {indicator}")
+            except Exception as e:
+                st.warning(f"FRED series {series_id} not found for {indicator}, using alternative sources: {e}")
+                # Fallback to TE if FRED fails
+                te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
+                url = f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
+                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.ok:
+                    data_json = response.json()
+                    if data_json and isinstance(data_json, list) and len(data_json) > 0:
+                        data["current"] = float(data_json[0].get("Last", np.nan)) if data_json[0].get("Last") else np.nan
+                        data["previous"] = float(data_json[0].get("Previous", np.nan)) if data_json[0].get("Previous") else np.nan
         # WB for global
         elif indicator in WB_MAP and WB_MAP[indicator]:
             code = WB_MAP[indicator]
@@ -330,14 +339,17 @@ for ind in selected:
     with st.expander(f"Details for {ind}", expanded=False):
         st.write(f"**Threshold:** {THRESHOLDS.get(ind, 'N/A')}")
     if ind in FRED_MAP and FRED_MAP[ind]:
-        series = fred.get_series(FRED_MAP[ind])
-        fig = px.line(series.to_frame(name=ind), title=f"{ind} Trend", template="plotly_dark", markers=True)
-        fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#ecf0f1'),
-            showlegend=True
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        try:
+            series = fred.get_series(FRED_MAP[ind])
+            fig = px.line(series.to_frame(name=ind), title=f"{ind} Trend", template="plotly_dark", markers=True)
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#ecf0f1'),
+                showlegend=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Chart error for {ind}: {e}")
 st.sidebar.markdown("---")
 st.sidebar.markdown("<p style='text-align: center; color: #7f8c8d; background: #ecf0f1; padding: 5px; border-radius: 5px;'>Powered by xAI</p>", unsafe_allow_html=True)
