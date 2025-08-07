@@ -268,14 +268,14 @@ def fetch_data(indicator):
         # Trading Economics API for forecasts and financial
         te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
         url = f"https://api.tradingeconomics.com/markets?countries=united-states&c={te_indicator}&outtype=json&api_key={te_api_key}" if "P/E ratios" in indicator or "Asset prices" in indicator else f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
-        response = requests.get(url)
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
         if response.ok:
             data_json = response.json()
             if data_json and isinstance(data_json, list) and len(data_json) > 0:
                 data["current"] = float(data_json[0].get("Last", np.nan)) if data_json[0].get("Last") else np.nan
                 data["previous"] = float(data_json[0].get("Previous", np.nan)) if data_json[0].get("Previous") else np.nan
                 data["forecast"] = float(data_json[0].get("Forecast", np.nan)) if data_json[0].get("Forecast") else np.nan
-        # Scrape for specialized (verified with web_search: GFP for Power, Transparency for Corruption)
+        # Scrape for specialized
         else:
             url = f"https://www.globalfirepower.com/countries-listing.php" if "Power index" in indicator else f"https://www.transparency.org/en/cpi/2023" if "Corruption index" in indicator else ""
             if url:
