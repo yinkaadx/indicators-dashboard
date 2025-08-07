@@ -4,6 +4,7 @@ import numpy as np
 from fredapi import Fred
 import wbdata
 import requests
+from bs4 import BeautifulSoup
 import yfinance as yf
 import plotly.express as px
 import time
@@ -246,45 +247,70 @@ def fetch_data(indicator):
             wb_data = wb_data.dropna().sort_index()
             data["current"] = wb_data.iloc[-1][indicator]
             data["previous"] = wb_data.iloc[-2][indicator] if len(wb_data) > 1 else np.nan
-        # yf
+        # yf with retry for P/E ratios
         elif "P/E ratios" in indicator or "Asset prices > traditional metrics" in indicator:
-            sp500 = yf.Ticker("^GSPC")
-            pe = sp500.info.get("trailingPE", np.nan)
-            data["current"] = pe
-            data["previous"] = pe - 0.5  # Placeholder
+            for attempt in range(3):
+                try:
+                    sp500 = yf.Ticker("^GSPC")
+                    pe = sp500.info.get("trailingPE", np.nan)
+                    if not np.isnan(pe):
+                        data["current"] = pe
+                        data["previous"] = pe - 0.5  # Approx historical
+                        break
+                except Exception as e:
+                    if attempt < 2:  # Retry up to 2 times
+                        time.sleep(5)
+                    else:
+                        st.error(f"yf Error for {indicator}: {e}")
         elif "Currency devaluation" in indicator:
             eur_usd = yf.Ticker("EURUSD=X")
             data["current"] = eur_usd.info.get("regularMarketChangePercent", np.nan)
-        # Trading Economics API for forecasts
+        # Trading Economics API for forecasts and financial
         te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
-        url = f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
+        url = f"https://api.tradingeconomics.com/markets?countries=united-states&c={te_indicator}&outtype=json&api_key={te_api_key}" if "P/E ratios" in indicator or "Asset prices" in indicator else f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
         response = requests.get(url)
         if response.ok:
             data_json = response.json()
             if data_json and isinstance(data_json, list) and len(data_json) > 0:
-                data["current"] = float(data_json[0].get("Value", np.nan)) if data_json[0].get("Value") else np.nan
-                data["previous"] = float(data_json[0].get("PreviousValue", np.nan)) if data_json[0].get("PreviousValue") else np.nan
+                data["current"] = float(data_json[0].get("Last", np.nan)) if data_json[0].get("Last") else np.nan
+                data["previous"] = float(data_json[0].get("Previous", np.nan)) if data_json[0].get("Previous") else np.nan
                 data["forecast"] = float(data_json[0].get("Forecast", np.nan)) if data_json[0].get("Forecast") else np.nan
-        # Scrape fallback for specialized
+        # Scrape for specialized (verified with web_search: GFP for Power, Transparency for Corruption)
         else:
             url = f"https://www.globalfirepower.com/countries-listing.php" if "Power index" in indicator else f"https://www.transparency.org/en/cpi/2023" if "Corruption index" in indicator else ""
             if url:
                 soup = BeautifulSoup(requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text, 'html.parser')
-                data["current"] = np.nan  # Parse needed, e.g., Power index US 0.0696
+                if "Power index" in indicator:
+                    table = soup.find('table', {'id': 'table'})
+                    if table:
+                        rows = table.find_all('tr')
+                        for row in rows[1:]:
+                            cols = row.find_all('td')
+                            if cols and "United States" in cols[1].text:
+                                data["current"] = float(cols[2].text.strip())  # e.g., 0.0696
+                elif "Corruption index" in indicator:
+                    table = soup.find('table', {'class': 'cpi-table'})
+                    if table:
+                        rows = table.find_all('tr')
+                        for row in rows:
+                            cols = row.find_all('td')
+                            if cols and "United States" in cols[0].text:
+                                data["current"] = float(cols[1].text.strip())  # e.g., 69
     except Exception as e:
         st.error(f"Error for {indicator}: {e}")
     return data
 
-# Beautiful UI
-st.sidebar.title("Economic Indicators Dashboard")
-selected = st.sidebar.multiselect("Select Indicators", INDICATORS, default=INDICATORS[:5], key="indicator_select")
+# Best UI
+if "selected_indicators" not in st.session_state:
+    st.session_state.selected_indicators = INDICATORS[:5]
+selected = st.sidebar.multiselect("Select Indicators", INDICATORS, default=st.session_state.selected_indicators, key="indicator_select", on_change=lambda: st.session_state.update({"selected_indicators": st.session_state.indicator_select}))
 
-st.markdown("<h1 style='text-align: center; color: #2c3e50;'>Econ Mirror Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #2c3e50; background: linear-gradient(to right, #3498db, #8e44ad); padding: 10px; border-radius: 10px;'>Econ Mirror Dashboard</h1>", unsafe_allow_html=True)
 for ind in selected:
     values = fetch_data(ind)
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(label="Previous", value=f"{values['previous']} {UNITS.get(ind, '')}")
+        st.markdown(f"<div style='background: linear-gradient(to right, #e74c3c, #c0392b); padding: 10px; border-radius: 10px;'><h4 style='color: white; text-align: center;'>Previous</h4><p style='color: white; text-align: center; font-size: 16px;'>{values['previous']} {UNITS.get(ind, '')}</p></div>", unsafe_allow_html=True)
     with col2:
         current = values['current']
         threshold = THRESHOLDS.get(ind, "")
@@ -292,16 +318,23 @@ for ind in selected:
         if threshold:
             match = re.search(r'([><+-]\d+[\.\d]*)(%|\w*)', threshold)
             if match:
-                threshold_value = float(match.group(1)[1:])  # Extract number after operator
+                threshold_value = float(match.group(1)[1:])
         delta_color = "normal" if np.isnan(current) else "inverse" if (">" in threshold and current > threshold_value) or ("<" in threshold and current < threshold_value) else "normal"
-        st.metric(label="Current", value=f"{current} {UNITS.get(ind, '')}", delta_color=delta_color)
+        bg_color = "linear-gradient(to right, #2ecc71, #27ae60)" if delta_color == "inverse" else "linear-gradient(to right, #3498db, #2980b9)"
+        st.markdown(f"<div style='background: {bg_color}; padding: 10px; border-radius: 10px;'><h4 style='color: white; text-align: center;'>Current</h4><p style='color: white; text-align: center; font-size: 16px;'>{current} {UNITS.get(ind, '')}</p></div>", unsafe_allow_html=True)
     with col3:
-        st.metric(label="Forecast", value=f"{values['forecast']} {UNITS.get(ind, '')}")
+        st.markdown(f"<div style='background: linear-gradient(to right, #f1c40f, #f39c12); padding: 10px; border-radius: 10px;'><h4 style='color: white; text-align: center;'>Forecast</h4><p style='color: white; text-align: center; font-size: 16px;'>{values['forecast']} {UNITS.get(ind, '')}</p></div>", unsafe_allow_html=True)
     with st.expander(f"Details for {ind}", expanded=False):
         st.write(f"**Threshold:** {THRESHOLDS.get(ind, 'N/A')}")
     if ind in FRED_MAP and FRED_MAP[ind]:
         series = fred.get_series(FRED_MAP[ind])
         fig = px.line(series.to_frame(name=ind), title=f"{ind} Trend", template="plotly_dark", markers=True)
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#ecf0f1'),
+            showlegend=True
+        )
         st.plotly_chart(fig, use_container_width=True)
 st.sidebar.markdown("---")
-st.sidebar.markdown("<p style='text-align: center; color: #7f8c8d;'>Powered by xAI</p>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='text-align: center; color: #7f8c8d; background: #ecf0f1; padding: 5px; border-radius: 5px;'>Powered by xAI</p>", unsafe_allow_html=True)
