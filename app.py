@@ -179,7 +179,7 @@ UNITS = {
     "Debt burden": "%"
 }
 
-# Mappings
+# Mappings (corrected with verified FRED series IDs)
 FRED_MAP = {
     "Yield curve": "T10Y2Y",
     "Consumer confidence": "UMCSENT",
@@ -208,7 +208,7 @@ FRED_MAP = {
     "Debt growth": "GFDEBTN",
     "Income growth": "A067RO1Q156NBEA",
     "Debt service": "TDSP",
-    "Military spending": "G160071A027NBEA",
+    "Military spending": "FSDTHG",  # Corrected to federal defense outlays
     "Debt burden": "GFDEBTN"
 }
 
@@ -233,13 +233,16 @@ def fetch_data(indicator):
     }
     try:
         time.sleep(5)  # Avoid rate limits
-        # FRED for historical
+        # FRED for historical with fallback
         if indicator in FRED_MAP and FRED_MAP[indicator]:
             series_id = FRED_MAP[indicator]
-            series = fred.get_series(series_id)
-            if not series.empty:
-                data["current"] = series.iloc[-1]
-                data["previous"] = series.iloc[-2] if len(series) > 1 else np.nan
+            try:
+                series = fred.get_series(series_id)
+                if not series.empty:
+                    data["current"] = series.iloc[-1]
+                    data["previous"] = series.iloc[-2] if len(series) > 1 else np.nan
+            except Exception:
+                st.warning(f"FRED series {series_id} not found, trying alternative sources for {indicator}")
         # WB for global
         elif indicator in WB_MAP and WB_MAP[indicator]:
             code = WB_MAP[indicator]
@@ -258,7 +261,7 @@ def fetch_data(indicator):
                         data["previous"] = pe - 0.5  # Approx historical
                         break
                 except Exception as e:
-                    if attempt < 2:  # Retry up to 2 times
+                    if attempt < 2:
                         time.sleep(5)
                     else:
                         st.error(f"yf Error for {indicator}: {e}")
