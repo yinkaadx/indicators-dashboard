@@ -69,7 +69,7 @@ INDICATORS = [
     "Debt burden"
 ]
 
-# Single Threshold per indicator (parsed from your text; e.g., key one like >80% for Capacity utilization from Late Overheating)
+# Single Threshold per indicator
 THRESHOLDS = {
     "Yield curve": "10Y-2Y >1% (steepens)",
     "Consumer confidence": ">90 index (rising)",
@@ -123,7 +123,7 @@ THRESHOLDS = {
     "Debt burden": ">100% GDP (high)"
 }
 
-# Units per indicator (verified with sources like FRED, WB)
+# Units per indicator (verified with FRED, WB, yf)
 UNITS = {
     "Yield curve": "%",
     "Consumer confidence": "Index",
@@ -177,7 +177,7 @@ UNITS = {
     "Debt burden": "%"
 }
 
-# Mappings (expanded to 50, verified with web_search)
+# Mappings (expanded, verified with web_search)
 FRED_MAP = {
     "Yield curve": "T10Y2Y",
     "Consumer confidence": "UMCSENT",
@@ -231,79 +231,80 @@ def fetch_data(indicator):
         "forecast": np.nan
     }
     try:
-        time.sleep(5)  # Delay to avoid rate limits (e.g., yf 429)
+        time.sleep(5)  # Delay to avoid rate limits
         # FRED
         if indicator in FRED_MAP and FRED_MAP[indicator]:
             series_id = FRED_MAP[indicator]
             series = fred.get_series(series_id)
             if not series.empty:
                 data["current"] = series.iloc[-1]
-                data["previous"] = series.iloc[-2] if len(series) >1 else np.nan
+                data["previous"] = series.iloc[-2] if len(series) > 1 else np.nan
         # WB
         elif indicator in WB_MAP and WB_MAP[indicator]:
             code = WB_MAP[indicator]
             wb_data = wbdata.get_dataframe({code: indicator})
             wb_data = wb_data.dropna().sort_index()
             data["current"] = wb_data.iloc[-1][indicator]
-            data["previous"] = wb_data.iloc[-2][indicator] if len(wb_data) >1 else np.nan
+            data["previous"] = wb_data.iloc[-2][indicator] if len(wb_data) > 1 else np.nan
         # yf
         elif "P/E ratios" in indicator or "Asset prices > traditional metrics" in indicator:
             sp500 = yf.Ticker("^GSPC")
             pe = sp500.info.get("trailingPE", np.nan)
             data["current"] = pe
-            data["previous"] = pe - 0.5  # Placeholder, use historical if needed
+            data["previous"] = pe - 0.5  # Placeholder
         elif "Currency devaluation" in indicator:
             eur_usd = yf.Ticker("EURUSD=X")
             data["current"] = eur_usd.info.get("regularMarketChangePercent", np.nan)
-        # Scrape for others (e.g., "Power index")
+        # Scrape for others
         else:
             url = f"https://www.globalfirepower.com/countries-listing.php" if "Power index" in indicator else f"https://www.transparency.org/en/cpi/2023" if "Corruption index" in indicator else ""
             if url:
-                soup = BeautifulSoup(requests.get(url).text, 'html.parser')
-                # Parse based on site; e.g., for GFP, US power index 0.0696
-                data["current"] = np.nan  # Placeholder, expand parse as needed
-        # Forecast scrape from Trading Economics (interweave with historical)
+                soup = BeautifulSoup(requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text, 'html.parser')
+                data["current"] = np.nan  # Parse logic needed, e.g., for Power index US 0.0696
+        # Forecast from Trading Economics
         te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
         url = f"https://tradingeconomics.com/united-states/{te_indicator}"
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-        soup = BeautifulSoup(response.text, 'html.parser')
-        table = soup.find('table', class_='table')
-        if table:
-            rows = table.find_all('tr')
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) > 1:
-                    if "Previous" in cols[0].text:
-                        data["previous"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["previous"]
-                    if "Last" in cols[0].text:
-                        data["current"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["current"]
-                    if "Forecast" in cols[0].text:
-                        data["forecast"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["forecast"]
+        if response.ok:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            table = soup.find('table', class_='table')
+            if table:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cols = row.find_all('td')
+                    if len(cols) > 1:
+                        if "Previous" in cols[0].text:
+                            data["previous"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["previous"]
+                        if "Last" in cols[0].text:
+                            data["current"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["current"]
+                        if "Forecast" in cols[0].text:
+                            data["forecast"] = float(cols[1].text.strip()) if cols[1].text.strip() else data["forecast"]
     except Exception as e:
         st.error(f"Error for {indicator}: {e}")
     return data
 
-# UI (beautiful: sidebar for selection, columns for values with st.metric (color based on threshold), expander for threshold, chart)
-st.sidebar.title("Select Indicators")
-selected = st.sidebar.multiselect("Indicators", INDICATORS, default=INDICATORS[:5])
+# Beautiful UI
+st.sidebar.title("Economic Indicators Dashboard")
+selected = st.sidebar.multiselect("Select Indicators", INDICATORS, default=INDICATORS[:5], key="indicator_select")
 
+st.markdown("<h1 style='text-align: center; color: #2c3e50;'>Econ Mirror Dashboard</h1>", unsafe_allow_html=True)
 for ind in selected:
     values = fetch_data(ind)
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Previous", f"{values['previous']} {UNITS.get(ind, '')}")
+        st.metric(label="Previous", value=f"{values['previous']} {UNITS.get(ind, '')}")
     with col2:
         current = values['current']
-        threshold = THRESHOLDS.get(ind, "")
-        color = "normal" if np.isnan(current) else "off" if ">" in threshold and current < float(threshold.strip(' >%')) else "inverse" if "<" in threshold and current > float(threshold.strip(' <%')) else "normal"
-        st.metric("Current", f"{current} {UNITS.get(ind, '')}", delta_color=color)
+        threshold_value = float(THRESHOLDS.get(ind, "").split()[0].strip('><%')) if THRESHOLDS.get(ind) else np.nan
+        delta_color = "normal" if np.isnan(current) else "inverse" if (">" in THRESHOLDS.get(ind) and current > threshold_value) or ("<" in THRESHOLDS.get(ind) and current < threshold_value) else "normal"
+        st.metric(label="Current", value=f"{current} {UNITS.get(ind, '')}", delta_color=delta_color)
     with col3:
-        st.metric("Forecast", f"{values['forecast']} {UNITS.get(ind, '')}")
-    with col4:
-        st.expander("Threshold").write(threshold)
-    # Chart if FRED series
+        st.metric(label="Forecast", value=f"{values['forecast']} {UNITS.get(ind, '')}")
+    with st.expander(f"Details for {ind}", expanded=False):
+        st.write(f"**Threshold:** {THRESHOLDS.get(ind, 'N/A')}")
     if ind in FRED_MAP and FRED_MAP[ind]:
         series = fred.get_series(FRED_MAP[ind])
-        fig = px.line(series.to_frame(name=ind), title=ind, markers=True)
-        fig.update_layout(template="plotly_dark")
+        fig = px.line(series.to_frame(name=ind), title=f"{ind} Trend", template="plotly_dark", markers=True)
         st.plotly_chart(fig, use_container_width=True)
+st.sidebar.markdown("---")
+st.sidebar.markdown("<p style='text-align: center; color: #7f8c8d;'>Powered by xAI</p>", unsafe_allow_html=True)
