@@ -1,21 +1,20 @@
-Remove-Item -Path app.py -Force
-@"
 import streamlit as st
 import pandas as pd
 import numpy as np
 from fredapi import Fred
 import wbdata
 import requests
-from bs4 import BeautifulSoup
 import yfinance as yf
 import plotly.express as px
 import time
+import re
 
 # Config
 st.set_page_config(page_title="Econ Mirror Dashboard", layout="wide", initial_sidebar_state="expanded")
 
 # Secrets
 fred = Fred(api_key=st.secrets["FRED_API_KEY"])
+te_api_key = "e8ebf3567f8b473:l8zd23rsl5xzf55"
 
 # Indicators List
 INDICATORS = [
@@ -256,22 +255,22 @@ def fetch_data(indicator):
         elif "Currency devaluation" in indicator:
             eur_usd = yf.Ticker("EURUSD=X")
             data["current"] = eur_usd.info.get("regularMarketChangePercent", np.nan)
-        # Scrape for specialized
+        # Trading Economics API for forecasts
+        te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
+        url = f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
+        response = requests.get(url)
+        if response.ok:
+            data_json = response.json()
+            if data_json and isinstance(data_json, list) and len(data_json) > 0:
+                data["current"] = float(data_json[0].get("Value", np.nan)) if data_json[0].get("Value") else np.nan
+                data["previous"] = float(data_json[0].get("PreviousValue", np.nan)) if data_json[0].get("PreviousValue") else np.nan
+                data["forecast"] = float(data_json[0].get("Forecast", np.nan)) if data_json[0].get("Forecast") else np.nan
+        # Scrape fallback for specialized
         else:
             url = f"https://www.globalfirepower.com/countries-listing.php" if "Power index" in indicator else f"https://www.transparency.org/en/cpi/2023" if "Corruption index" in indicator else ""
             if url:
                 soup = BeautifulSoup(requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text, 'html.parser')
-                data["current"] = np.nan  # Parse needed, e.g., for Power index US 0.0696
-        # Trading Economics API for forecasts (verified with your key; e.g., GDP forecast ~23T)
-        te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
-        url = f"https://api.tradingeconomics.com/economic/indicator/united-states/{te_indicator}?c={te_api_key}"
-        response = requests.get(url)
-        if response.ok:
-            data_json = response.json()
-            if data_json:
-                data["current"] = data_json[0].get("Last", np.nan)
-                data["previous"] = data_json[0].get("Previous", np.nan)
-                data["forecast"] = data_json[0].get("Forecast", np.nan)
+                data["current"] = np.nan  # Parse needed, e.g., Power index US 0.0696
     except Exception as e:
         st.error(f"Error for {indicator}: {e}")
     return data
@@ -291,11 +290,9 @@ for ind in selected:
         threshold = THRESHOLDS.get(ind, "")
         threshold_value = np.nan
         if threshold:
-            # Extract number after '>' or '<' or '+' or '-', handling formats like "+5% YoY" or ">80%"
-            import re
             match = re.search(r'([><+-]\d+[\.\d]*)(%|\w*)', threshold)
             if match:
-                threshold_value = float(match.group(1)[1:])  # Remove operator for value
+                threshold_value = float(match.group(1)[1:])  # Extract number after operator
         delta_color = "normal" if np.isnan(current) else "inverse" if (">" in threshold and current > threshold_value) or ("<" in threshold and current < threshold_value) else "normal"
         st.metric(label="Current", value=f"{current} {UNITS.get(ind, '')}", delta_color=delta_color)
     with col3:
