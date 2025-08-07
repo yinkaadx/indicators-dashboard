@@ -1,5 +1,3 @@
-Remove-Item -Path app.py -Force
-@"
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -289,4 +287,3 @@ for ind in selected:
         series = fred.get_series(FRED_MAP[ind])
         fig = px.line(series.to_frame(name=ind), title=ind)
         st.plotly_chart(fig)
-"@ | Out-File app.py -Encoding utf8
