@@ -1,4 +1,3 @@
-Remove-Item -Path app.py -Force; @"
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -209,8 +208,8 @@ FRED_MAP = {
     "Debt growth": "GFDEBTN",
     "Income growth": "A067RO1Q156NBEA",
     "Debt service": "TDSP",
-    "Military spending": "A063RC1Q027SBEA",  # National defense outlays
-    "Debt burden": "GFDEBTN"  # Total public debt
+    "Military spending": "A063RC1Q027SBEA",
+    "Debt burden": "GFDEBTN"
 }
 
 WB_MAP = {
@@ -227,14 +226,9 @@ WB_MAP = {
 
 @st.cache_data(ttl=86400)
 def fetch_data(indicator):
-    data = {
-        "previous": np.nan,
-        "current": np.nan,
-        "forecast": np.nan
-    }
+    data = {"previous": np.nan, "current": np.nan, "forecast": np.nan}
     try:
-        time.sleep(5)  # Avoid rate limits
-        # FRED for historical with fallback
+        time.sleep(5)
         if indicator in FRED_MAP and FRED_MAP[indicator]:
             series_id = FRED_MAP[indicator]
             try:
@@ -244,7 +238,6 @@ def fetch_data(indicator):
                     data["previous"] = series.iloc[-2] if len(series) > 1 else np.nan
             except Exception as e:
                 st.warning(f"FRED series {series_id} not found for {indicator}, using alternative sources: {e}")
-                # Fallback to TE if FRED fails
                 te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
                 url = f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
                 response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -253,14 +246,12 @@ def fetch_data(indicator):
                     if data_json and isinstance(data_json, list) and len(data_json) > 0:
                         data["current"] = float(data_json[0].get("Last", np.nan)) if data_json[0].get("Last") else np.nan
                         data["previous"] = float(data_json[0].get("Previous", np.nan)) if data_json[0].get("Previous") else np.nan
-        # WB for global
         elif indicator in WB_MAP and WB_MAP[indicator]:
             code = WB_MAP[indicator]
             wb_data = wbdata.get_dataframe({code: indicator})
             wb_data = wb_data.dropna().sort_index()
             data["current"] = wb_data.iloc[-1][indicator]
             data["previous"] = wb_data.iloc[-2][indicator] if len(wb_data) > 1 else np.nan
-        # yf with retry for P/E ratios
         elif "P/E ratios" in indicator or "Asset prices > traditional metrics" in indicator:
             for attempt in range(3):
                 try:
@@ -268,7 +259,7 @@ def fetch_data(indicator):
                     pe = sp500.info.get("trailingPE", np.nan)
                     if not np.isnan(pe):
                         data["current"] = pe
-                        data["previous"] = pe - 0.5  # Approx historical
+                        data["previous"] = pe - 0.5
                         break
                 except Exception as e:
                     if attempt < 2:
@@ -278,7 +269,6 @@ def fetch_data(indicator):
         elif "Currency devaluation" in indicator:
             eur_usd = yf.Ticker("EURUSD=X")
             data["current"] = eur_usd.info.get("regularMarketChangePercent", np.nan)
-        # Trading Economics API for forecasts and financial
         te_indicator = indicator.lower().replace(' ', '-').replace('>', '').replace('(', '').replace(')', '').replace('/', '-')
         url = f"https://api.tradingeconomics.com/markets?countries=united-states&c={te_indicator}&outtype=json&api_key={te_api_key}" if "P/E ratios" in indicator or "Asset prices" in indicator else f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={te_indicator}&c={te_api_key}"
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -288,7 +278,6 @@ def fetch_data(indicator):
                 data["current"] = float(data_json[0].get("Last", np.nan)) if data_json[0].get("Last") else np.nan
                 data["previous"] = float(data_json[0].get("Previous", np.nan)) if data_json[0].get("Previous") else np.nan
                 data["forecast"] = float(data_json[0].get("Forecast", np.nan)) if data_json[0].get("Forecast") else np.nan
-        # Scrape for specialized
         else:
             url = f"https://www.globalfirepower.com/countries-listing.php" if "Power index" in indicator else f"https://www.transparency.org/en/cpi/2023" if "Corruption index" in indicator else ""
             if url:
@@ -300,7 +289,7 @@ def fetch_data(indicator):
                         for row in rows[1:]:
                             cols = row.find_all('td')
                             if cols and "United States" in cols[1].text:
-                                data["current"] = float(cols[2].text.strip())  # e.g., 0.0696
+                                data["current"] = float(cols[2].text.strip())
                 elif "Corruption index" in indicator:
                     table = soup.find('table', {'class': 'cpi-table'})
                     if table:
@@ -308,12 +297,11 @@ def fetch_data(indicator):
                         for row in rows:
                             cols = row.find_all('td')
                             if cols and "United States" in cols[0].text:
-                                data["current"] = float(cols[1].text.strip())  # e.g., 69
+                                data["current"] = float(cols[1].text.strip())
     except Exception as e:
         st.error(f"Error for {indicator}: {e}")
     return data
 
-# Best UI
 if "selected_indicators" not in st.session_state:
     st.session_state.selected_indicators = INDICATORS[:5]
 selected = st.sidebar.multiselect("Select Indicators", INDICATORS, default=st.session_state.selected_indicators, key="indicator_select", on_change=lambda: st.session_state.update({"selected_indicators": st.session_state.indicator_select}))
@@ -351,6 +339,4 @@ for ind in selected:
             )
             st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
-            st.warning(f"Chart error for {ind}: {e}")
-st.sidebar.markdown("---")
-st.sidebar.markdown("<p style='text-align: center; color: #7f8c8d; background: #ecf0f1; padding: 5px; border-radius: 5px;'>Powered by xAI</p>", unsafe_allow_html=True)
+            st.warning(f"Chart not available for {ind}: {e}")

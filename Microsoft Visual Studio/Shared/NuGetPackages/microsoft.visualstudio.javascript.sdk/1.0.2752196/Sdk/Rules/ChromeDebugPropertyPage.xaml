@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Rule Name="ChromeDebugPropertyPage"
+      Description="Properties associated with launching and debugging a custom debug target."
+      DisplayName="Chrome"
+      PageTemplate="commandNameBasedDebugger"
+      xmlns:sys="clr-namespace:System;assembly=mscorlib"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.Metadata>
+        <sys:String x:Key="CommandName">chrome</sys:String>
+
+        <!-- KnownImageIds.ImageCatalogGuid -->
+        <sys:Guid x:Key="ImageMonikerGuid">AE27A6B0-E345-4288-96DF-5EAF394EE369</sys:Guid>
+
+        <!-- KnownImageIds.Execute -->
+        <sys:Int32 x:Key="ImageMonikerId">1173</sys:Int32>
+    </Rule.Metadata>
+
+    <Rule.DataSource>
+        <DataSource Persistence="LaunchJson"
+                HasConfigurationCondition="False"
+                ItemType="LaunchProfile"/>
+    </Rule.DataSource>
+
+    <EnumProperty Name="Request"
+              DisplayName="Request"
+              Description="The debug request type ('launch' or 'attach')."
+              Category="General" >
+      <EnumValue Name="launch" DisplayName="launch" />
+      <EnumValue Name="attach" DisplayName="attach" />
+    </EnumProperty>
+
+    <StringProperty Name="Url"
+                DisplayName="App Url"
+                Description="The url to open a browser to."
+                Category="General" />
+
+    <StringProperty Name="WebRoot"
+                DisplayName="WebRoot"
+                Subtype="folder"
+                Description="This specifies the workspace absolute path to the webserver root. Used to resolve paths like `/app.js` to files on disk. Shorthand for a pathMapping for '/'."
+                Category="General" />
+</Rule>

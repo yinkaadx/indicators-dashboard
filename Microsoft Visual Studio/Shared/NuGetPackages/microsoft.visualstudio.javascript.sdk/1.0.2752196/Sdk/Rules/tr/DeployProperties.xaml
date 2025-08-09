@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Dağıtma" Description="Dağıtım seçenekleri" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Başlangıç Komutu" Description="Başlangıçta yürütülecek komut."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Çalışma Dizini" Description="Başlangıç komutunun çalışma dizini. Göreli yollar, proje köküne görelidir. Varsayılan olarak, proje kökü." Subtype="folder"/>
+</Rule>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<ProjectSchemaDefinitions xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <ItemType Name="None" DisplayName="Není součástí sestavení"/>
+    <ItemType Name="TypeScriptConfiguration" DisplayName="Konfigurace projektu JavaScript/TypeScript"/>
+</ProjectSchemaDefinitions>

@@ -1,0 +1,1545 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Microsoft.VisualStudio.ExtensionManager</name>
+    </assembly>
+    <members>
+        <member name="F:Microsoft.Internal.Performance.CodeMarkers.State.Enabled">
+            <summary>
+            The atom is present. CodeMarkers are enabled.
+            </summary>
+        </member>
+        <member name="F:Microsoft.Internal.Performance.CodeMarkers.State.Disabled">
+            <summary>
+            The atom is not present, but InitPerformanceDll has not yet been called.
+            </summary>
+        </member>
+        <member name="F:Microsoft.Internal.Performance.CodeMarkers.State.DisabledDueToDllImportException">
+            <summary>
+            Disabled because the CodeMarkers transport DLL could not be found or
+            an import failed to resolve.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Internal.Performance.CodeMarkers.IsEnabled">
+            <summary>
+            Are CodeMarkers enabled? Note that even if IsEnabled returns false, CodeMarkers
+            may still be enabled later in another component.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarker(System.Int32)">
+            <summary>
+            Sends a code marker event
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarkerEx(System.Int32,System.Byte[])">
+            <summary>
+            Sends a code marker event with additional user data
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <param name="aBuff">User data buffer. May not be null.</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+            <exception cref="T:System.ArgumentNullException">aBuff was null</exception>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.SetStateDLLException">
+            <summary>
+            Used by ManagedPerfTrack.cs to report errors accessing the DLL.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarkerEx(System.Int32,System.Guid)">
+            <summary>
+            Sends a code marker event with additional Guid user data
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <param name="guidData">The additional Guid to include with the event</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarkerEx(System.Int32,System.String)">
+            <summary>
+            Sends a code marker event with additional String user data
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <param name="stringData">The additional String to include with the event</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.StringToBytesZeroTerminated(System.String)">
+            <summary>
+            Converts a string into a byte buffer including a zero terminator (needed for proper ETW message formatting)
+            </summary>
+            <param name="stringData">String to be converted to bytes</param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarkerEx(System.Int32,System.UInt32)">
+            <summary>
+            Sends a code marker event with additional DWORD user data
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <param name="uintData">The additional DWORD to include with the event</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.CodeMarkerEx(System.Int32,System.UInt64)">
+            <summary>
+            Sends a code marker event with additional QWORD user data
+            </summary>
+            <param name="nTimerID">The code marker event ID</param>
+            <param name="ulongData">The additional QWORD to include with the event</param>
+            <returns>true if the code marker was successfully sent, false if code markers are
+            not enabled or an error occurred.</returns>
+        </member>
+        <member name="M:Microsoft.Internal.Performance.CodeMarkers.UsePrivateCodeMarkers(System.String,Microsoft.Win32.RegistryView)">
+            <summary>
+            Checks the registry to see if code markers are enabled
+            </summary>
+            <param name="regRoot">The registry root</param>
+            <param name="registryView">The registry view.</param>
+            <returns>Whether CodeMarkers are enabled in the registry</returns>
+        </member>
+        <member name="T:Microsoft.Internal.Performance.CodeMarkerStartEnd">
+            <summary>
+            Use CodeMarkerStartEnd in a using clause when you need to bracket an
+            operation with a start/end CodeMarker event pair.  If you are using correlated
+            codemarkers and providing your own event manifest, include two GUIDs (the correlation
+            "marker" and the correlation ID itself) as the very first fields.
+            </summary>
+        </member>
+        <member name="T:Microsoft.Internal.Performance.CodeMarkerExStartEnd">
+            <summary>
+            Use CodeMarkerExStartEnd in a using clause when you need to bracket an
+            operation with a start/end CodeMarker event pair.  If you are using correlated
+            codemarkers and providing your own event manifest, include two GUIDs (the correlation
+            "marker" and the correlation ID itself) as the very first fields.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.DotnetRuntime">
+            <summary>
+            Represents a major .NET runtime version.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.DotnetRuntimeStatus">
+            <summary>
+            List of possible states a runtime can be in.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager">
+            <summary>
+            Defines core logic for managing target .NET runtime settings for VS.Extensibility extensions.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager.VsInstance">
+            <summary>
+            The VS instance this runtime manager is registered for.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager.GetRuntime(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension,Microsoft.VisualStudio.ExtensionManager.DotnetRuntime@,Microsoft.VisualStudio.ExtensionManager.DotnetRuntimeStatus@)">
+            <summary>
+            Gets the runtime and status for a given OOP VisualStudio.Extensibility extension.
+            The returned runtime will ALWAYS be a valid/supported runtime that is installed with VS.
+            The <paramref name="runtimeStatus" /> indicates the status of the most recent .NET version the extension is supported for, which may or may not be the returned <paramref name="runtime" />.
+            </summary>
+            <param name="extension">The installed extension.</param>
+            <param name="runtime">A valid runtime that is installed with VS that is the best available match, given (1) what is installed with VS and (2) what the extension is supported for.</param>
+            <param name="runtimeStatus">The status of the most recent .NET version the extension is supported for.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager.GetRuntimes">
+            <summary>
+            Returns a list of all .NET runtimes available for a given VS instance.
+            </summary>
+            <returns>A list of the available app-local .NET runtimes.</returns>
+            <exception cref="T:Microsoft.VisualStudio.ExtensionManager.NoAvailableRuntimesException">Thrown if there are no app-local .NET runtimes available for the VS instance.</exception>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager.GetDefaultRuntime">
+            <summary>
+            Returns the default .NET runtime for VS.Extensibility extensions.
+            If the statically defined default runtime is not available for the given VS instance, use the oldest available .NET runtime.
+            </summary>
+            <returns>The runtime to use by default.</returns>
+            <exception cref="T:Microsoft.VisualStudio.ExtensionManager.NoAvailableRuntimesException">Thrown if there are no app-local .NET runtimes available for the VS instance.</exception>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager.ShouldCheckRuntimeInfo(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Determines whether or not an extension should be evaluated for runtime status.
+            </summary>
+            <param name="extension"></param>
+            <returns>True if the extension has a dependency on a .NET runtime, false otherwise.</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.Telemetry">
+            <summary>
+            Utility class used by Extension Manager to encapsulate telemetry logic
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.ExtensionManangerWindowTestContract">
+            <summary>
+            Class which gives apex access to the opened extension and update dialog 
+            and an event which lets apex know when the dialog is opened.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IExtensionManangerWindowTestContract">
+            <summary>
+            Interface to allow apex to interact with the extension manager window
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.INotifiableExtensionManager">
+            <summary>
+            Interface for notifying the extension manager to change its settings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.INotifiableExtensionManager.UpdateLastExtensionsChangedTimestamp(System.Boolean,System.Nullable{System.DateTime})">
+            <summary>
+            Set the last extensions changed timestamp to be the current timestamp.
+            </summary>
+            <param name="alsoUpdateConfigurationChangedTimestamp">
+            If true, the ConfigurationChanged timestamp will also be updated (through
+            the per-machine location if possible; otherwise, it will update the 
+            ConfigurationChanged timestamp in the user's settings). If false, only
+            the ExtensionsChanged timestamp will be updated.
+            </param>
+            <param name="lastConfigChange">Timestamp that should be used to indicate the extension changed event.  Uses DateTime.UtcNow by default.</param>
+            <returns>
+            The timestamp that was set.
+            </returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IRepositoryMetadataSerializer">
+            <summary>
+            Interface used to serialize/deserialize specific metadata returned by the repository service.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IRoamedExtensionManager">
+            <summary>
+            Interface used for searching for installed extensions
+            </summary>
+        </member>
+        <member name="E:Microsoft.VisualStudio.ExtensionManager.IRoamedExtensionManager.InstallCompleted">
+            <summary>
+            The event that fires when an extension is installed
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedExtensionManager.GetInstalledExtensions">
+            <summary>
+            Returns all of the extensions that are installed
+            </summary>
+            <returns>A collection of all of the installed extensions on the current machine</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedExtensionManager.TryGetInstalledExtension(System.String,Microsoft.VisualStudio.ExtensionManager.IInstalledExtension@)">
+            <summary>
+            Attempts to retrieve the installed extension whose identifier matches <paramref name="identifier" />
+            </summary>
+            <param name="identifier">The extension's unique identifier</param>
+            <param name="result"></param>
+            <returns>True if the extension was found, false otherwise</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedExtensionManager.GetInstalledExtension(System.String)">
+            <summary>
+            Retrieve the installed extension whose identifier matches <paramref name="identifier" />
+            </summary>
+            <param name="identifier">The extension's unique identifier</param>
+            <returns>The extension with the identifier <paramref name="identifier" /> or null if the extension was not found</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList">
+            <summary>
+            Contains a collection of roamed extensions
+            </summary>
+        </member>
+        <member name="E:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.CollectionChanged">
+            <summary>
+            Event used to flag a CollectionChanged event when the roamed list of extensions changes
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.Keys">
+            <summary>
+            An array of keys that uniquely identify each extension in the collection
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.AddCollectionChangedAsyncHandler(Microsoft.VisualStudio.Settings.CollectionChangedAsyncEventHandler)">
+            <summary>
+            Adds a CollectionChangedAsync event handler to the collection of extensions
+            </summary>
+            <param name="handler">The event handler</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.AddToFrontAsync(System.String,Microsoft.VisualStudio.ExtensionManager.RoamedExtension)">
+            <summary>
+            Adds a new extension to the front of the roamed extension collection asynchronously
+            </summary>
+            <param name="identifier">Unique identifier of the extension to add to the collection</param>
+            <param name="item">The item to add the collection</param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.RemoveAsync(System.String)">
+            <summary>
+            Removes an extension whose key matches <paramref name="identifier" /> from the collection
+            </summary>
+            <param name="identifier">Unique identifier of the extension</param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsList.GetValueOrDefault(System.String)">
+            <summary>
+            Searches for an item whose identifier matches <paramref name="key" /> and returns the item if is found
+            A default value is returned otherwise
+            </summary>
+            <param name="key">Unique identifier of an item in the store</param>
+            <returns></returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsManager">
+            <summary>
+            The gateway class to the list of roamed extensions
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamedSettingsManager.GetOrCreateList(System.String)">
+            <summary>
+            Finds and returns a store matching <paramref name="name" />
+            If a store under that name is not found, one is created
+            </summary>
+            <param name="name">Name of the store being accessed</param>
+            <returns>The list of roamed extensions, can be used to add and remove items from the roamed list</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnExtensionsLoaded(System.Int32)">
+            <summary>
+            Fires the event to log the number of not installed extensions that are being roamed by the logged in user
+            </summary>
+            <param name="numberOfExtensions">The number of not installed roamed extensions for a specific user on a specific instance of VS</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnRoamingExtensionManagerOpened">
+            <summary>
+            Fires the event to log the event where the Roaming Extension tab was opened
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnRoamedExtensionInstalled(System.String)">
+            <summary>
+            Fires the event to log the identifier of an extension that was installed
+            </summary>
+            <param name="extensionIdentifier">The identifier of the extension that was installed</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnRoamedExtensionSelected(System.String)">
+            <summary>
+            Fires the event to log the identifier of an extension that was selected
+            </summary>
+            <param name="extensionIdentifier">The identifier of the extension that was selected</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnStopRoamingCommandExecuted(System.String)">
+            <summary>
+            Fires the event to log the identifier of an extension that was explicitly "unroamed"
+            </summary>
+            <param name="extensionIdentifier">The identifier of the extension that was removed form the roaming list</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IRoamingExtensionTelemetryNotifier.OnStartRoamingCommandExecuted(System.String)">
+            <summary>
+            Fires the event to log the identifier of an extension that was explicitly "roamed"
+            </summary>
+            <param name="extensionIdentifier">The identifier of the extension that was added form the roaming list</param>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IUserAccountRecognizer">
+            <summary>
+            Determines whether there is a user currently signed in
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IUserAccountRecognizer.IsUserSignedIn">
+            <summary>
+            Recognizes if a user is signed in and returns an appropriate value
+            </summary>
+            <returns>True if a user is signed in, false otherwise</returns>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.ExtensionsToInstall">
+            <summary>
+            The list of extensions that will be schedule to install
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.OperationCancelled">
+            <summary>
+            True when the download was cancelled before finishing.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.ExceptionsMessage">
+            <summary>
+            The full list of exceptions that ocurred during the download.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.DownloadExtension(Microsoft.VisualStudio.ExtensionManager.IRepositoryEntry,System.Object,System.Boolean)">
+            <summary>
+            Downloads the given extension for install/update.
+            </summary>
+            <param name="entry">The extension to download.</param>
+            <param name="owner">The System.Windows.Window that is the parent of the dialog to show.</param>
+            <param name="isUpdate">Tells whether it is a fresh install or an update</param>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.LastException">
+            <summary>
+            Gets the last exception that was raised during install process 
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.DownloadExtensions(System.Collections.Generic.IEnumerable{Microsoft.VisualStudio.ExtensionManager.IRepositoryEntry},System.Object,System.Boolean)">
+            <summary>
+            Downloads the given list of extensions for install/update.
+            </summary>
+            <param name="entries">The extensions to download.</param>
+            <param name="owner">The System.Windows.Window that is the parent of the dialog to show.</param>
+            <param name="isUpdate">Tells whether it is a fresh install or an update</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.ShowReleaseNotes(Microsoft.VisualStudio.ExtensionManager.IExtension,System.Object)">
+            <summary>
+            Shows the Release Notes Dialog for local releases notes or opens up browser for URLs.
+            </summary>
+            <param name="extension">The extension whose release notes are viewed.</param>
+            <param name="owner">The System.Windows.Window that is the parent of the dialog to show.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionDialogService.DownloadExtensionAndLaunchVsixInstaller(Microsoft.VisualStudio.ExtensionManager.IRepositoryEntry,System.Object)">
+            <summary>
+            Downloads the extension specified by the IRepositoryEntry object and launches the VSIX Installer to install it
+            </summary>
+            <param name="entry">Extension to install</param>
+            <param name="owner">The System.Windows.Window that is the parent of the dialog to show.</param>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager">
+            <summary>
+            Interface used to manage and search for installed extensions.
+            </summary>
+        </member>
+        <member name="E:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.InstallCompleted">
+            <summary>
+            Event fired when an InstallAsync completes, is cancelled, or has an error.
+            </summary>
+        </member>
+        <member name="E:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.InstallProgressChanged">
+            <summary>
+            Event fired as progress is made after starting an Install with InstallAsync.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.CreateExtension(System.String)">
+            <summary>
+            Extension factory method.
+            </summary>
+            <param name="extensionPath">Path to a VSIX manifest XML.</param>
+            <returns>The IExtension object containing the metadata in the extension's VSIX manifest.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.CreateInstallableExtension(System.String)">
+            <summary>
+            Factory method for extensions that are installable.
+            </summary>
+            <param name="extensionPath">Path to a VSIX package file.</param>
+            <returns>An IInstallableExtension object that may be passed to the Install API.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetAutoUpdateableInstalledExtensions">
+            <summary>
+            Filters <seealso cref="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetInstalledExtensions" /> and keeps extensions that allow changing their auto update settings.
+            </summary>
+            <returns>List of extensions that allow modifying their auto update state without requiring admin priviledges.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetInstalledExtensions">
+            <summary>
+            Query for all installed extensions under ExtensionsRoot.
+            </summary>
+            <returns>A collection of IExtension objects containing the metadata of all installed extensions.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetInstalledExtension(System.String)">
+            <summary>
+            Query for an installed extension by the extension ID.
+            </summary>
+            <param name="identifier">The unique Identifier of an extension.</param>
+            <returns>An IExtension object with the queried extension's metadata.</returns>
+            <exception cref="T:Microsoft.VisualStudio.ExtensionManager.NotInstalledException">Thrown if an extension with the given extension ID is not installed.</exception>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.TryGetInstalledExtension(System.String,Microsoft.VisualStudio.ExtensionManager.IInstalledExtension@)">
+            <summary>
+            Query for an installed extension by the extension ID.
+            </summary>
+            <param name="identifier">The unique Identifier of an extension.</param>
+            <param name="result">An IExtension object with the queried extension's metadata if the extension is installed. Otherwise, returns null.</param>
+            <returns>True if the extension is installed. False, otherwise.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetEnabledExtensions">
+            <summary>
+            Query for all enabled extensions under ExtensionsRoot.
+            </summary>
+            <returns>A collection of IExtension objects containing the metadata of all enabled extensions.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetEnabledExtensions(System.String)">
+            <summary>
+            Query for all enabled extensions that contain a particular content type (such as ItemTemplates, MEFComponent, etc.).
+            </summary>
+            <param name="contentTypeName">The content type to filter the search by.</param>
+            <returns>A collection of IExtension objects containing the metadata of all enabled extensions that contain the requested content type.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetEnabledExtensionContentLocations(System.String)">
+            <summary>
+            Query for a collection of paths to all content of a particular type that is included in enabled extensions.
+            </summary>
+            <param name="contentTypeName">The content type to filter the search by.</param>
+            <returns>A collection of paths that correspond to values of the VSIX manifest 'Content' section for the requested content type.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetEnabledExtensionContentLocations(System.String,System.Collections.Generic.IDictionary{System.String,System.String})">
+            <summary>
+            Query for a collection of paths to all content of a particular type that is included in enabled extensions.
+            
+            Filter the results by matching the given attributes with the XML attributes on the content node
+            </summary>
+            <param name="contentTypeName">The content type to filter the search by.</param>
+            <param name="attributes">The attributes of the content to match.</param>
+            <returns>A collection of paths that correspond to values of the VSIX manifest 'Content' section for the requested content type.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.IsInstalled(Microsoft.VisualStudio.ExtensionManager.IExtension)">
+            <summary>
+            Determines whether an extension is installed in any ExtensionsRoot directory.
+            </summary>
+            <param name="extension">The extension to query for.</param>
+            <returns>True if the extension is installed. False otherwise</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Enable(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Enables an extension so that it becomes loadable. This action may require a restart of Visual Studio for an extension to become loadable.
+            </summary>
+            <param name="extension">The extension to be enabled.</param>
+            <returns>RestartReason.PendingEnable if a restart of Visual Studio is required. RestartReason.None otherwise.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Install(Microsoft.VisualStudio.ExtensionManager.IInstallableExtension,System.Boolean)">
+            <summary>
+            Installs an extension to the ExtensionsRoot directory. 
+            Installing an extension through this method will automatically enable the extension as well.
+            This action may require a restart of Visual Studio for an extension to become loadable.
+            Upon a successful install, this method will set the InstallPath property of the IExtension object.
+            </summary>
+            <param name="extension">The extension to be installed. This must be an extension that was created from a VSIX package.</param>
+            <param name="perMachine">Denotes whether an extension should be installed on a per-machine basis or only for the current user.</param>
+            <returns>RestartReason.PendingEnable if a restart of Visual Studio is required. RestartReason.None otherwise.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.InstallAsync(Microsoft.VisualStudio.ExtensionManager.IInstallableExtension,System.Boolean)">
+            <summary>
+            Asynchronously installs an extension to the ExtensionsRoot directory. Installs invoked through this method are not cancelable.
+            </summary>
+            <param name="extension">The extension to be installed. This must be an extension that was created from a VSIX package.</param>
+            <param name="perMachine">Denotes whether an extension should be installed on a per-machine basis or only for the current user.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.InstallAsync(Microsoft.VisualStudio.ExtensionManager.IInstallableExtension,System.Boolean,System.Object)">
+            <summary>
+            Asynchronously installs an extension to the ExtensionsRoot directory. Installs invoked through this method may be canceled by passing the userState object to the InstallAsyncCancel method.
+            </summary>
+            <param name="extension">The extension to be installed. This must be an extension that was created from a VSIX package.</param>
+            <param name="perMachine">Denotes whether an extension should be installed on a per-machine basis or only for the current user.</param>
+            <param name="userState">An task ID that may be used to track multiple invocations of this method in event handlers.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.InstallAsyncCancel(System.Object)">
+            <summary>
+            Cancels a pending asynchronous install operation.
+            </summary>
+            <param name="userState">A task ID denoting which invocation of Install() should be canceled.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Uninstall(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Uninstalls an extension from the ExtensionsRoot directory. A restart of Visual Studio is required for the uninstall to complete.
+            </summary>
+            <param name="extension">The extension to be uninstalled.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Revert(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Uninstalls the extension and then reverts the extension to the installed version in the Visual Studio installation directory.
+            </summary>
+            <param name="extension">The extension to be uninstalled.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.RevertUninstall(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Reverts an uninstalled extension back to an installed state. This API will only succeed for extensions that have been Uninstalled through the Uninstall API.
+            Furthermore, this API must be called before the Extension Manager is restarted since pending uninstalls are cleaned up during initialization. Otherwise,
+            a NotPendingDeletionException will be thrown.
+            </summary>
+            <param name="extension">An extension that was passed to the Uninstall API.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Disable(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Disables an installed extension from being loadable. A restart of Visual Studio may be required for the extension to be unloaded.
+            </summary>
+            <param name="extension">The extension to be disabled.</param>
+            <returns>RestartReason.PendingDisable if a restart of Visual Studio is required. RestartReason.None otherwise.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.FindMissingReferences(Microsoft.VisualStudio.ExtensionManager.IExtension)">
+            <summary>
+            Checks whether all references of a given extension are installed. This method will only check for first level
+            dependencies and will not verify that references of references are installed.
+            </summary>
+            <param name="extension">The extension whose references will be checked.</param>
+            <returns>A subset of the extension's references that correspond to extensions that the Extension Manager was unable to located in installed locations.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetImmediateDependants(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Finds all installed extensions that depend on the given extension.
+            </summary>
+            <param name="extension">The extension whose dependants to find.</param>
+            <returns>A collection of installed extensions that depend on the extension queried.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetExtensionPacks(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Finds all installed extension packs that contain the given extension.
+            </summary>
+            <param name="extension">The extension that is part of extension pack to find.</param>
+            <returns>A collection of installed extension packs that contain extension queried.</returns>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.RestartRequired">
+            <summary>
+            Denotes whether the Extension Manager service has performed an operation that requires a restart to complete.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.DidLoadUserExtensions">
+            <summary>
+            Gets a value determining whether or not user extensions were allowed to load at application startup.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.Close">
+            <summary>
+            Allows the extension manager object to do final cleanup before shutting down. Calling this method is optional,
+            however, doing so will improve performance by reducing the initialization time when the next extension manager service
+            object is created.
+            
+            No other methods should be called on the object after calling this method.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetLastExtensionsChangedTimestamp">
+            <summary>
+            Gets the UTC timestamp (as a FILETIME structure) of the latest
+            update to the list of extensions by the Extension Manager Service.
+            </summary>
+            <returns>the latest stored UTC timestamp</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.ValidReferenceSpecialCase(Microsoft.VisualStudio.ExtensionManager.IExtensionReference)">
+            <summary>
+            Validate if a reference is in a valid special case so we can claim it is installed.
+            </summary>
+            <returns>True is the reference matches a special case.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.GetExtensionsByInstallType(Microsoft.VisualStudio.ExtensionManager.ExtensionType)">
+            <summary>
+            Allows us to retrieve extensions of only a specific type to allow ease of filtering between the various install types.
+            </summary>        
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.RegisterForHotloadNotifications(Microsoft.VisualStudio.ExtensionManager.ExtensionHotloadCompletedEventHandler)">
+            <summary>
+            Register for hotload notifications.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManager.UnregisterHotloadNotifications(Microsoft.VisualStudio.ExtensionManager.ExtensionHotloadCompletedEventHandler)">
+            <summary>
+            Remove hotload notification registration. No-op if the method was not registered.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerAsync.GetInstalledExtensionsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Get all installed extensions.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerAsync.GetEnabledExtensionsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Get all enabled installed extensions.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerAsync.GetExtensionByIdAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Query for an installed extension by the extension ID.
+            </summary>
+            <param name="identifier">The unique Identifier of an extension.</param>
+            <returns>An IExtension object with the queried extension's metadata.</returns>
+            <exception cref="T:Microsoft.VisualStudio.ExtensionManager.NotInstalledException">Thrown if an extension with the given extension ID is not installed.</exception>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerUIHelper">
+            <summary>
+            Contains properties and methods to determine extension state and user actions
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerUIHelper.CanToggleExtensionState(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Gets if an extension state can be toggled by user
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerUIHelper.CanShowExtensionAsEnabled(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Gets if an extension should be listed as enabled to user in extension manager flows
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionManagerUIHelper.GetExtensionToggleStateActionDisabledReason(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension)">
+            <summary>
+            Gets the toggle state disabled reason if CanToggleState is false for an extension
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRepository">
+            <summary>
+            Interface used to communicate with an online repository of extensions
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRepositoryQuery`1.SearchText">
+            <summary>
+            A search string that will be used to perform a search on various extension properties (Name, Author, Description, etc..)
+            to further filter the query. The logic for which properties contribute to the search resides on the server.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager">
+            <summary>
+            Interface for service which is used for reading and setting the runtime and extension targets for VisualStudio.Extensibility extensions during F5 debug.
+            The F5 extension (1) target runtime and (2) extension ID are set from the DotnetF5TargetPackage and VsixDeployEngine, respectively.
+            These values are consumed by the DebugLaunchProvider from the Gladstone repo during debug launch. The values are given as args to devenv, which are read during VS startup.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager.SetRuntimeTarget(Microsoft.VisualStudio.ExtensionManager.DotnetRuntime)">
+            <summary>
+            Set the target runtime which will be applied during the next F5 run launched from the current VS instance.
+            </summary>
+            <param name="runtime">Runtime to use for extension under F5 debug.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager.SetExtensionTarget(System.String)">
+            <summary>
+            Set the target extension which is being debugged during F5 launch.
+            </summary>
+            <param name="extensionId">Extension identifier.</param>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager.ClearSettings">
+            <summary>
+            Clears the F5 settings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager.GetFormattedDevenvArgs">
+            <summary>
+            Tries to get the args that should be passed to devenv during F5 if both the required params have been set.
+            </summary>
+            <returns>If a target extension and target runtime are set, returns the devenv args to override the extension runtime in the launched experimental instance. Otherwise, returns null.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeDebugManager.IsUnderDebug(Microsoft.VisualStudio.ExtensionManager.IInstalledExtension,Microsoft.VisualStudio.Shell.Interop.IVsAppCommandLine,System.Nullable{Microsoft.VisualStudio.ExtensionManager.DotnetRuntime}@)">
+            <summary>
+            Determines if an extension is actively under F5 debug, and if so, returns the runtime override.
+            </summary>
+            <param name="extension">Extension under consideration.</param>
+            <param name="commandLineService">Command line service.</param>
+            <param name="f5Runtime">F5 runtime override, if found.</param>
+            <returns>True if the extension is currently under F5, false otherwise.</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeManagerFactory">
+            <summary>
+            Interface used to get managers for VisualStudio.Extensibility extension .NET runtimes
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsExtensionRuntimeManagerFactory.GetRuntimeManager(Microsoft.VisualStudio.Setup.IVisualStudioInstance)">
+            <summary>
+            Fetches runtime manager for a given <see cref="T:Microsoft.VisualStudio.Setup.IVisualStudioInstance" />.
+            </summary>
+            <param name="instance">Target VS instance.</param>
+            <returns>A new instance of a <see cref="T:Microsoft.VisualStudio.ExtensionManager.IExtensionRuntimeManager" /> for the provided <paramref name="instance" />.</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.IVsInstalledExtensionDiscovery">
+            <summary>
+            Interface used to search for installed extensions
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsInstalledExtensionDiscovery.FindExtensionContainingPackage(System.Guid)">
+            <summary>
+            Gets the installed extension that contains the given VS package
+            </summary>
+            <param name="packageGuid">VS Package identifier</param>
+            <returns>an instance of installed extension or null if none can be found</returns>
+            <remarks>By default this method only searches non-system extensions for performance reasons</remarks>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsInstalledExtensionDiscovery.FindExtensionContainingPackage(System.Guid,System.Boolean)">
+            <summary>
+            Gets the installed extension that contains the given VS package
+            </summary>
+            <param name="packageGuid">VS Package identifier</param>
+            <param name="includeSystemPackages">If true system packages will be searched as well but at significantly higher execution cost</param>
+            <returns>an instance of installed extension or null if none can be found</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.IVsInstalledExtensionDiscovery.FindExtensionContainingModule(System.String,System.String)">
+            <summary>
+            Gets the installed extension that contains the given module
+            </summary>
+            <param name="contentTypeName">The content type to filter the search by.</param>
+            <param name="modulePath">Full path to the module</param>
+            <returns>an instance of installed extension or null if none can be found</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.ExtensionManager.RoamedExtension">
+            <summary>
+            A condensed version of a Visual Studio Extension only
+            containing enough information to uniquely and descriptively represent
+            the extension
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.Name">
+            <summary>
+            The name of the extension
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.NameDetails">
+            <summary>
+            Returns any additional text shown in the extension item's title area for screen readers.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.Identifier">
+            <summary>
+            Unique id used to query for extensions in the gallery
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.Description">
+            <summary>
+            A short description about what the extension is/does
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.DescriptionDetails">
+            <summary>
+            Returns any additional text shown in the extension item's description area for screen readers.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.IsDisplayedInRoamedList">
+            <summary>
+            True if the extension should be displayed in the roaming list, false otherwise
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.ExtensionManager.RoamedExtension.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Constructs the roamed extension object. IsDisplayedInRoamedList is true by default and needs to be explicitly made 
+            false after object creation if that is needed
+            </summary>
+            <param name="identifier">The extension's identifier</param>
+            <param name="name">The extension's name</param>
+            <param name="description">The extension's description</param>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.ISpecifyDefaultTreeNode">
+            <summary>
+            Specifies that a provider has perffered default tree node.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.ISpecifyDefaultTreeNode.PreferredDefaultTreeNode">
+            <summary>
+            Get the preffered default tree node in a provider's extensions tree.
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.IVsQueryInstalledTemplates">
+            <summary>
+            Installed template provider related methods
+            </summary>
+            <remarks>Note: This is for internal use only</remarks>
+        </member>
+        <member name="M:Microsoft.VisualStudio.TemplateProviders.IVsQueryInstalledTemplates.IsTemplateInstalled(System.String)">
+            <summary>
+            Determines if a template is installed on the local machine or not
+            </summary>
+            <param name="id">The template ID</param>
+            <returns>True: if the template is installed, false: if the template is not installed on the local machine</returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.IVsStickySource">
+            <summary>
+            Providers implementing this interface will have their last selected node and template stored
+            as sticky information
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.IVsTemplatePathServices">
+            <summary>
+            Describes methods to support conversions between node and paths in a template provider
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.TemplateProviders.IVsTemplatePathServices.GetNodeFromPath(System.String)">
+            <summary>
+            Gets the node from a given path
+            </summary>
+            <param name="path"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.TemplateProviders.IVsTemplatePathServices.GetPathFromNode(Microsoft.VisualStudio.ExtensionsExplorer.IVsExtensionsTreeNode)">
+            <summary>
+            Gets the path from a node in the tree
+            </summary>
+            <param name="node"></param>
+            <returns></returns>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.IVsTemplateProviderValidator">
+            <summary>
+            An interface for validator metadata that providers can use to verify if the provider
+            is valid for the current environment.
+            </summary>
+        </member>
+        <member name="M:Microsoft.VisualStudio.TemplateProviders.IVsTemplateProviderValidator.Validate(System.IServiceProvider,System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Validate the current environment for a provider.
+            </summary>
+            <param name="serviceProvider">A service provider for the validator to access VS services.</param>
+            <param name="dialogProperties">The dialog properties (the same property bag is exposed to providers via IPropertySink).</param>
+            <returns>true if successful. If fails, the client will discard the related provider.</returns>
+        </member>
+        <member name="M:Microsoft.VisualStudio.TemplateProviders.IVsTemplateTree.ApplyFrameworkVersionFilter(System.UInt32)">
+            <summary>
+            This method is called when framework version filter needs to be applied to templates stored in the tree node
+            
+            The method implementation should be modifying the nodes list object that was sent to dialog before. 
+            It shouldn't be creating a new nodes list
+            </summary>
+            <param name="frameworkVersion"></param>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.ProviderType">
+            <summary>
+            The type of the Template Provider that provided this template
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.Hierarchy">
+            <summary>
+            The hierarchy in which this project template exists in the tree
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.Id">
+            <summary>
+            The unique ID of the template
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.Name">
+            <summary>
+            The localized name of the template
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.Description">
+            <summary>
+            The localized description of the template
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.ProjectType">
+            <summary>
+            The project type - VB / C#, etc.
+            </summary>
+        </member>
+        <member name="P:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.Base64EncodedSerializedImage">
+            <summary>
+            Serialized and base 64 encoded image of the template
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.SettingNames.MRUTemplateListSettingName">
+            <summary>
+            The unique setting name used for MRU Templates
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.MRUTemplateInfo.SettingNames.RoamedButNotInstalledSettingName">
+            <summary>
+            The unique setting name used for templates that were roamed but not installed on the local machine
+            </summary>
+        </member>
+        <member name="T:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes">
+            <summary>
+            Types of templates a provider provides.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.None">
+            <summary>
+            Provides no templates.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.ProjectTemplates">
+            <summary>
+            VS project templates.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.ProjectItemTemplates">
+            <summary>
+            VS project item templates.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.WebsiteTemplates">
+            <summary>
+            VS web site templates.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.WebsiteItemTemplates">
+            <summary>
+            VS web site item templates.
+            </summary>
+        </member>
+        <member name="F:Microsoft.VisualStudio.TemplateProviders.VsTemplateTypes.All">
+            <summary>
+            All template types.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.AllowNullAttribute">
+            <summary>
+            Specifies that null is allowed as an input even if the corresponding type disallows it.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.ConstantExpectedAttribute">
+            <summary>
+            Indicates that the specified method parameter expects a constant.
+            </summary>
+            <remarks>
+            This can be used to inform tooling that a constant should be used as an argument for the annotated parameter.
+            </remarks>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.ConstantExpectedAttribute.Min">
+            <summary>
+            Indicates the minimum bound of the expected constant, inclusive.
+            </summary>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.ConstantExpectedAttribute.Max">
+            <summary>
+            Indicates the maximum bound of the expected constant, inclusive.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.DisallowNullAttribute">
+            <summary>
+            Specifies that null is disallowed as an input even if the corresponding type allows it.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute">
+            <summary>
+            Applied to a method that will never return under any circumstance.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute">
+            <summary>
+            Specifies that the method will not return if the associated Boolean parameter is passed the specified value.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute.#ctor(System.Boolean)">
+            <summary>
+            Initializes the attribute with the specified parameter value.
+            </summary>
+            <param name="parameterValue">
+            The condition parameter value. Code after the method will be considered unreachable
+            by diagnostics if the argument to the associated parameter matches this value.
+            </param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute.ParameterValue">
+            <summary>
+            Gets the condition parameter value.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.ExperimentalAttribute">
+            <summary>
+            Indicates that an API is experimental and it may change in the future.
+            </summary>
+            <remarks>
+            This attribute allows call sites to be flagged with a diagnostic that indicates that an experimental
+            feature is used. Authors can use this attribute to ship preview features in their assemblies.
+            </remarks>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.ExperimentalAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Diagnostics.CodeAnalysis.ExperimentalAttribute" /> class,
+            specifying the ID that the compiler will use when reporting a use of the API the attribute applies to.
+            </summary>
+            <param name="diagnosticId">The ID that the compiler will use when reporting a use of the API the attribute applies to.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.ExperimentalAttribute.DiagnosticId">
+            <summary>
+            Gets the ID that the compiler will use when reporting a use of the API the attribute applies to.
+            </summary>
+            <value>The unique diagnostic ID.</value>
+            <remarks>
+            The diagnostic ID is shown in build output for warnings and errors.
+            <para>This property represents the unique ID that can be used to suppress the warnings or errors, if needed.</para>
+            </remarks>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.ExperimentalAttribute.UrlFormat">
+            <summary>
+            Gets or sets the URL for corresponding documentation.
+            The API accepts a format string instead of an actual URL, creating a generic URL that includes the diagnostic ID.
+            </summary>
+            <value>The format string that represents a URL to corresponding documentation.</value>
+            <remarks>An example format string is <c>https://contoso.com/obsoletion-warnings/{0}</c>.</remarks>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.MaybeNullAttribute">
+            <summary>
+            Specifies that an output may be null even if the corresponding type disallows it.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute">
+            <summary>
+            Specifies that when a method returns <see cref="P:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute.ReturnValue" />, the parameter may be null even if the corresponding type disallows it.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute.#ctor(System.Boolean)">
+            <summary>
+            Initializes the attribute with the specified return value condition.
+            </summary>
+            <param name="returnValue">The return value condition. If the method returns this value, the associated parameter may be null.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute.ReturnValue">
+            <summary>
+            Gets the return value condition.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute">
+            <summary>
+            Specifies that the method or property will ensure that the listed field and property members have not-null values.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute.#ctor(System.String)">
+            <summary>
+            Initializes the attribute with a field or property member.
+            </summary>
+            <param name="member">The field or property member that is promised to be not-null.</param>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute.#ctor(System.String[])">
+            <summary>
+            Initializes the attribute with the list of field and property members.
+            </summary>
+            <param name="members">The list of field and property members that are promised to be not-null.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute.Members">
+            <summary>
+            Gets field or property member names.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute">
+            <summary>
+            Specifies that the method or property will ensure that the listed field and property
+            members have not-null values when returning with the specified return value condition.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute.#ctor(System.Boolean,System.String)">
+            <summary>
+            Initializes the attribute with the specified return value condition and a field or property member.
+            </summary>
+            <param name="returnValue">The return value condition. If the method returns this value, the associated parameter will not be null.</param>
+            <param name="member">The field or property member that is promised to be not-null.</param>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute.#ctor(System.Boolean,System.String[])">
+            <summary>
+            Initializes the attribute with the specified return value condition and list of field and property members.
+            </summary>
+            <param name="returnValue">The return value condition. If the method returns this value, the associated parameter will not be null.</param>
+            <param name="members">The list of field and property members that are promised to be not-null.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute.ReturnValue">
+            <summary>
+            Gets the return value condition.
+            </summary>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute.Members">
+            <summary>
+            Gets field or property member names.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.NotNullAttribute">
+            <summary>
+            Specifies that an output will not be null even if the corresponding type allows it.
+            Specifies that an input argument was not null when the call returns.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute">
+            <summary>
+            Specifies that the output will be non-null if the named parameter is non-null.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute.#ctor(System.String)">
+            <summary>
+            Initializes the attribute with the associated parameter name.
+            </summary>
+            <param name="parameterName">The associated parameter name. The output will be non-null if the argument to the parameter specified is non-null.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute.ParameterName">
+            <summary>
+            Gets the associated parameter name.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute">
+            <summary>
+            Specifies that when a method returns <see cref="P:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute.ReturnValue" />, the parameter will not be null even if the corresponding type allows it.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute.#ctor(System.Boolean)">
+            <summary>
+            Initializes the attribute with the specified return value condition.
+            </summary>
+            <param name="returnValue">The return value condition. If the method returns this value, the associated parameter will not be null.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute.ReturnValue">
+            <summary>Gets the return value condition.</summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute">
+            <summary>
+            Specifies that this constructor sets all required members for the current type,
+            and callers do not need to set any required members themselves.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute">
+            <summary>
+            Specifies the syntax used in a string.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.#ctor(System.String)">
+            <summary>
+            Initializes the <see cref="T:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute" /> with the identifier of the syntax used.
+            </summary>
+            <param name="syntax">The syntax identifier.</param>
+        </member>
+        <member name="M:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.#ctor(System.String,System.Object[])">
+            <summary>Initializes the <see cref="T:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute" /> with the identifier of the syntax used.</summary>
+            <param name="syntax">The syntax identifier.</param>
+            <param name="arguments">Optional arguments associated with the specific syntax employed.</param>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Syntax">
+            <summary>Gets the identifier of the syntax used.</summary>
+        </member>
+        <member name="P:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Arguments">
+            <summary>Optional arguments associated with the specific syntax employed.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.CompositeFormat">
+            <summary>The syntax identifier for strings containing composite formats for string formatting.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.DateOnlyFormat">
+            <summary>The syntax identifier for strings containing date format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.DateTimeFormat">
+            <summary>The syntax identifier for strings containing date and time format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.EnumFormat">
+            <summary>The syntax identifier for strings containing <see cref="T:System.Enum" /> format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.GuidFormat">
+            <summary>The syntax identifier for strings containing <see cref="T:System.Guid" /> format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Json">
+            <summary>The syntax identifier for strings containing JavaScript Object Notation (JSON).</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.NumericFormat">
+            <summary>The syntax identifier for strings containing numeric format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Regex">
+            <summary>The syntax identifier for strings containing regular expressions.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.TimeOnlyFormat">
+            <summary>The syntax identifier for strings containing time format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.TimeSpanFormat">
+            <summary>The syntax identifier for strings containing <see cref="T:System.TimeSpan" /> format specifiers.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Uri">
+            <summary>The syntax identifier for strings containing URIs.</summary>
+        </member>
+        <member name="F:System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.Xml">
+            <summary>The syntax identifier for strings containing XML.</summary>
+        </member>
+        <member name="T:System.Diagnostics.CodeAnalysis.UnscopedRefAttribute">
+            <summary>
+            Used to indicate a byref escapes and is not scoped.
+            </summary>
+            <remarks>
+            <para>
+            There are several cases where the C# compiler treats a <see langword="ref" /> as implicitly
+            <see langword="scoped" /> - where the compiler does not allow the <see langword="ref" /> to escape the method.
+            </para>
+            <para>
+            For example:
+            <list type="number">
+                <item><see langword="this" /> for <see langword="struct" /> instance methods.</item>
+                <item><see langword="ref" /> parameters that refer to <see langword="ref" /> <see langword="struct" /> types.</item>
+                <item><see langword="out" /> parameters.</item>
+            </list>
+            </para>
+            <para>
+            This attribute is used in those instances where the <see langword="ref" /> should be allowed to escape.
+            </para>
+            <para>
+            Applying this attribute, in any form, has impact on consumers of the applicable API. It is necessary for
+            API authors to understand the lifetime implications of applying this attribute and how it may impact their users.
+            </para>
+            </remarks>
+        </member>
+        <member name="T:System.Index">
+            <summary>Represent a type can be used to index a collection either from the start or the end.</summary>
+            <remarks>
+            Index is used by the C# compiler to support the new index syntax
+            <code>
+            int[] someArray = new int[5] { 1, 2, 3, 4, 5 } ;
+            int lastElement = someArray[^1]; // lastElement = 5
+            </code>
+            </remarks>
+        </member>
+        <member name="M:System.Index.#ctor(System.Int32,System.Boolean)">
+            <summary>Construct an Index using a value and indicating if the index is from the start or from the end.</summary>
+            <param name="value">The index value. it has to be zero or positive number.</param>
+            <param name="fromEnd">Indicating if the index is from the start or from the end.</param>
+            <remarks>
+            If the Index constructed from the end, index value 1 means pointing at the last element and index value 0 means pointing at beyond last element.
+            </remarks>
+        </member>
+        <member name="P:System.Index.Start">
+            <summary>Create an Index pointing at first element.</summary>
+        </member>
+        <member name="P:System.Index.End">
+            <summary>Create an Index pointing at beyond last element.</summary>
+        </member>
+        <member name="M:System.Index.FromStart(System.Int32)">
+            <summary>Create an Index from the start at the position indicated by the value.</summary>
+            <param name="value">The index value from the start.</param>
+        </member>
+        <member name="M:System.Index.FromEnd(System.Int32)">
+            <summary>Create an Index from the end at the position indicated by the value.</summary>
+            <param name="value">The index value from the end.</param>
+        </member>
+        <member name="P:System.Index.Value">
+            <summary>Returns the index value.</summary>
+        </member>
+        <member name="P:System.Index.IsFromEnd">
+            <summary>Indicates whether the index is from the start or the end.</summary>
+        </member>
+        <member name="M:System.Index.GetOffset(System.Int32)">
+            <summary>Calculate the offset from the start using the giving collection length.</summary>
+            <param name="length">The length of the collection that the Index will be used with. length has to be a positive value</param>
+            <remarks>
+            For performance reason, we don't validate the input length parameter and the returned offset value against negative values.
+            we don't validate either the returned offset is greater than the input length.
+            It is expected Index will be used with collections which always have non negative length/count. If the returned offset is negative and
+            then used to index a collection will get out of range exception which will be same affect as the validation.
+            </remarks>
+        </member>
+        <member name="M:System.Index.Equals(System.Object)">
+            <summary>Indicates whether the current Index object is equal to another object of the same type.</summary>
+            <param name="value">An object to compare with this object</param>
+        </member>
+        <member name="M:System.Index.Equals(System.Index)">
+            <summary>Indicates whether the current Index object is equal to another Index object.</summary>
+            <param name="other">An object to compare with this object</param>
+        </member>
+        <member name="M:System.Index.GetHashCode">
+            <summary>Returns the hash code for this instance.</summary>
+        </member>
+        <member name="M:System.Index.op_Implicit(System.Int32)~System.Index">
+            <summary>Converts integer number to an Index.</summary>
+        </member>
+        <member name="M:System.Index.ToString">
+            <summary>Converts the value of the current Index object to its equivalent string representation.</summary>
+        </member>
+        <member name="T:System.Range">
+            <summary>Represent a range has start and end indexes.</summary>
+            <remarks>
+            Range is used by the C# compiler to support the range syntax.
+            <code>
+            int[] someArray = new int[5] { 1, 2, 3, 4, 5 };
+            int[] subArray1 = someArray[0..2]; // { 1, 2 }
+            int[] subArray2 = someArray[1..^0]; // { 2, 3, 4, 5 }
+            </code>
+            </remarks>
+        </member>
+        <member name="P:System.Range.Start">
+            <summary>Represent the inclusive start index of the Range.</summary>
+        </member>
+        <member name="P:System.Range.End">
+            <summary>Represent the exclusive end index of the Range.</summary>
+        </member>
+        <member name="M:System.Range.#ctor(System.Index,System.Index)">
+            <summary>Construct a Range object using the start and end indexes.</summary>
+            <param name="start">Represent the inclusive start index of the range.</param>
+            <param name="end">Represent the exclusive end index of the range.</param>
+        </member>
+        <member name="M:System.Range.Equals(System.Object)">
+            <summary>Indicates whether the current Range object is equal to another object of the same type.</summary>
+            <param name="value">An object to compare with this object</param>
+        </member>
+        <member name="M:System.Range.Equals(System.Range)">
+            <summary>Indicates whether the current Range object is equal to another Range object.</summary>
+            <param name="other">An object to compare with this object</param>
+        </member>
+        <member name="M:System.Range.GetHashCode">
+            <summary>Returns the hash code for this instance.</summary>
+        </member>
+        <member name="M:System.Range.ToString">
+            <summary>Converts the value of the current Range object to its equivalent string representation.</summary>
+        </member>
+        <member name="M:System.Range.StartAt(System.Index)">
+            <summary>Create a Range object starting from start index to the end of the collection.</summary>
+        </member>
+        <member name="M:System.Range.EndAt(System.Index)">
+            <summary>Create a Range object starting from first element in the collection to the end Index.</summary>
+        </member>
+        <member name="P:System.Range.All">
+            <summary>Create a Range object starting from first element to the end.</summary>
+        </member>
+        <member name="M:System.Range.GetOffsetAndLength(System.Int32)">
+            <summary>Calculate the start offset and length of range object using a collection length.</summary>
+            <param name="length">The length of the collection that the range will be used with. length has to be a positive value.</param>
+            <remarks>
+            For performance reason, we don't validate the input length parameter against negative values.
+            It is expected Range will be used with collections which always have non negative length/count.
+            We validate the range is inside the length scope though.
+            </remarks>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute">
+            <summary>
+            An attribute that allows parameters to receive the expression of other parameters.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute" /> class.
+            </summary>
+            <param name="parameterName">The condition parameter value.</param>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.ParameterName">
+            <summary>
+            Gets the parameter name the expression is retrieved from.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.CollectionBuilderAttribute.#ctor(System.Type,System.String)">
+            <summary>
+            Initialize the attribute to refer to the <paramref name="methodName" /> method on the <paramref name="builderType" /> type.
+            </summary>
+            <param name="builderType">The type of the builder to use to construct the collection.</param>
+            <param name="methodName">The name of the method on the builder to use to construct the collection.</param>
+            <remarks>
+            <paramref name="methodName" /> must refer to a static method that accepts a single parameter of
+            type <see cref="T:System.ReadOnlySpan`1" /> and returns an instance of the collection being built containing
+            a copy of the data from that span.  In future releases of .NET, additional patterns may be supported.
+            </remarks>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.CollectionBuilderAttribute.BuilderType">
+            <summary>
+            Gets the type of the builder to use to construct the collection.
+            </summary>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.CollectionBuilderAttribute.MethodName">
+            <summary>
+            Gets the name of the method on the builder to use to construct the collection.
+            </summary>
+            <remarks>
+            This should match the metadata name of the target method.
+            For example, this might be ".ctor" if targeting the type's constructor.
+            </remarks>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute">
+            <summary>
+            Indicates that compiler support for a particular feature is required for the location where this attribute is applied.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.#ctor(System.String)">
+            <summary>
+            Creates a new instance of the <see cref="T:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute" /> type.
+            </summary>
+            <param name="featureName">The name of the feature to indicate.</param>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.FeatureName">
+            <summary>
+            The name of the compiler feature.
+            </summary>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.IsOptional">
+            <summary>
+            If true, the compiler can choose to allow access to the location where this attribute is applied if it does not understand <see cref="P:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.FeatureName" />.
+            </summary>
+        </member>
+        <member name="F:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.RefStructs">
+            <summary>
+            The <see cref="P:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.FeatureName" /> used for the ref structs C# feature.
+            </summary>
+        </member>
+        <member name="F:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.RequiredMembers">
+            <summary>
+            The <see cref="P:System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute.FeatureName" /> used for the required members C# feature.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute">
+            <summary>
+            Indicates which arguments to a method involving an interpolated string handler should be passed to that handler.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute" /> class.
+            </summary>
+            <param name="argument">The name of the argument that should be passed to the handler.</param>
+            <remarks><see langword="null" /> may be used as the name of the receiver in an instance method.</remarks>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute.#ctor(System.String[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute" /> class.
+            </summary>
+            <param name="arguments">The names of the arguments that should be passed to the handler.</param>
+            <remarks><see langword="null" /> may be used as the name of the receiver in an instance method.</remarks>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.InterpolatedStringHandlerArgumentAttribute.Arguments">
+            <summary>
+            Gets the names of the arguments that should be passed to the handler.
+            </summary>
+            <remarks><see langword="null" /> may be used as the name of the receiver in an instance method.</remarks>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute">
+            <summary>
+            Indicates the attributed type is to be used as an interpolated string handler.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.IsExternalInit">
+            <summary>
+            Reserved to be used by the compiler for tracking metadata.
+            This class should not be used by developers in source code.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.ModuleInitializerAttribute">
+             <summary>
+             Used to indicate to the compiler that a method should be called
+             in its containing module's initializer.
+             </summary>
+             <remarks>
+             When one or more valid methods
+             with this attribute are found in a compilation, the compiler will
+             emit a module initializer which calls each of the attributed methods.
+            
+             Certain requirements are imposed on any method targeted with this attribute:
+             - The method must be `static`.
+             - The method must be an ordinary member method, as opposed to a property accessor, constructor, local function, etc.
+             - The method must be parameterless.
+             - The method must return `void`.
+             - The method must not be generic or be contained in a generic type.
+             - The method's effective accessibility must be `internal` or `public`.
+            
+             The specification for module initializers in the .NET runtime can be found here:
+             https://github.com/dotnet/runtime/blob/main/docs/design/specs/Ecma-335-Augments.md#module-initializer
+             </remarks>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute">
+            <summary>
+            Specifies the priority of a member in overload resolution. When unspecified, the default priority is 0.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute" /> class.
+            </summary>
+            <param name="priority">The priority of the attributed member. Higher numbers are prioritized, lower numbers are deprioritized. 0 is the default if no attribute is present.</param>
+        </member>
+        <member name="P:System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute.Priority">
+            <summary>
+            The priority of the member.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.ParamCollectionAttribute">
+            <summary>
+            Indicates that a method will allow a variable number of arguments in its invocation.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.RequiredMemberAttribute">
+            <summary>
+            Specifies that a type has required members or that a member is required.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.RequiresLocationAttribute">
+            <summary>
+            Reserved for use by a compiler for tracking metadata.
+            This attribute should not be used by developers in source code.
+            </summary>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.SkipLocalsInitAttribute">
+            <summary>
+            Used to indicate to the compiler that the <c>.locals init</c> flag should not be set in method headers.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" /> class.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute" /> class with the specified message.
+            </summary>
+            <param name="message">An optional message associated with this attribute instance.</param>
+        </member>
+        <member name="P:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute.Message">
+            <summary>
+            Returns the optional message associated with this attribute instance.
+            </summary>
+        </member>
+        <member name="P:System.Runtime.Versioning.RequiresPreviewFeaturesAttribute.Url">
+            <summary>
+            Returns the optional URL associated with this attribute instance.
+            </summary>
+        </member>
+    </members>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /><SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" /><DigestValue>9w3VV5HtThNRBkWbUyoRUCZWkSyvk90yHmx+/Zky12g=</DigestValue></Reference></SignedInfo><SignatureValue>CfwUPuh37k0Re/uTpPwTv/1qxbRKemd5iInLxwzI/cR3vDWq+tYOxyMg/7OICilP/Nvw1bqmRaey/tzgNrVZD+nOtMikH6Ilfge6Sg87PlyrNETuMOW5I15d7s9MLoiDGB3iBuvcwZUsLqcFi4dLyT/+3zQdM9qOYRCfMed3DZijbXb/wIHQMvgTlt7L59uwYvUp23RNiShfw2Bhy0ubFUm+GWD9UUrrPUOSYyI30RX8ic7EqoPzURKN21pk++M906Ado6jbmpHrVeYnbuyflKqLbPys8z5COgORXWcMCenbBnoDEMpdG6XeV5oph1NfGuM/yplwYvq5MYKTUMmSTQ==</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>7XpKjCg5837MnNU9UKR3xba/q5Iq/JXcyzypjF20Q6LlVwLLwX3ehPNrT4+GM2kpbhg0KF9zaTCqKCnlRY4zUat+8sk/4dUEyzAfHaZrGf+9FDPlP7GMb7dT1lsS4zDSF6swfD4xuoux9mBYJOGDoXxknpL581td3SwLX4w9MIsERD7wjZYpUc+16BXXuSjtNXhYlnrXoePKlDqlGgJCM5wuFwd7BXdS1lJrqVxytOUHyUpp3ovamSQWE7fGYQKxg4e50J/mNYzgN6AYglCeJ9QjGlnQ4a4HTLrtNuqFgG3wt6a6pFJ/C1qdvB/tki3rTRuSkGWcL8t2XJ+/j0BpeQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>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</X509Certificate><X509Certificate>MIIHejCCBWKgAwIBAgIKYQ6Q0gAAAAAAAzANBgkqhkiG9w0BAQsFADCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IDIwMTEwHhcNMTEwNzA4MjA1OTA5WhcNMjYwNzA4MjEwOTA5WjB+MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSgwJgYDVQQDEx9NaWNyb3NvZnQgQ29kZSBTaWduaW5nIFBDQSAyMDExMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAq/D6chAcLq3YbqqCEE00uvK2WCGfQhsqa+laUKq4BjgaBEm6f8MMHt03a8YS2AvwOMKZBrDIOdUBFDFC04kNeWSHfpRgJGyvnkmc6Whe0t+bU7IKLMOv2akrrnoJr9eWWcpgGgXpZnboMlImEi/nqwhQz7NEt13YxC4Ddato88tt8zpcoRb0RrrgOGSsbmQ1eKagYw8t00CT+OPeBw3VXHmlSSnnDb6gE3e+lD3v++MrWhAfTVYoonpy4BI6t0le2O3tQ5GD2Xuye4Yb2T6xjF3oiU+EGvKhL1nkkDstrjNYxbc+/jLTswM9sbKvkjh+0p2ALPVOVpEhNSXDOW5kf1O6nA+tGSOEy/S6A4aN91/w0FK/jJSHvMAhdCVfGCi2zCcoOCWYOUo2z3yxkq4cI6epZuxhH2rhKEmdX4jiJV3TIUs+UsS1Vz8kA/DRelsv1SPjcF0PUUZ3s/gA4bysAoJf28AVs70b1FVL5zmhD+kjSbwYuER8ReTBw3J64HLnJN+/RpnF78IcV9uDjexNSTCnq47f7Fufr/zdsGbiwZeBe+3W7UvnSSmnEyimp31ngOaKYnhfsi+E11ecXL93KCjx7W3DKI8sj0A3T8HhhUSJxAlMxdSlQy90lfdu+HggWCwTXWCVmj5PM4TasIgX3p5O9JawvEagbJjS4NaIjAsCAwEAAaOCAe0wggHpMBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBRIbmTlUAXTgqoXNzcitW2oynUClTAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAfBgNVHSMEGDAWgBRyLToCMZBDuRQFTuHqp8cx0SOJNDBaBgNVHR8EUzBRME+gTaBLhklodHRwOi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFfMDNfMjIuY3JsMF4GCCsGAQUFBwEBBFIwUDBOBggrBgEFBQcwAoZCaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraS9jZXJ0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFfMDNfMjIuY3J0MIGfBgNVHSAEgZcwgZQwgZEGCSsGAQQBgjcuAzCBgzA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9kb2NzL3ByaW1hcnljcHMuaHRtMEAGCCsGAQUFBwICMDQeMiAdAEwAZQBnAGEAbABfAHAAbwBsAGkAYwB5AF8AcwB0AGEAdABlAG0AZQBuAHQALiAdMA0GCSqGSIb3DQEBCwUAA4ICAQBn8oalmOBUeRou09h0ZyKbC5YR4WOSmUKWfdJ5DJDBZV8uLD74w3LRbYP+vj/oCso7v0epo/Np22O/IjWll11lhJB9i0ZQVdgMknzSGksc8zxCi1LQsP1r4z4HLimb5j0bpdS1HXeUOeLpZMlEPXh6I/MTfaaQdION9MsmAkYqwooQu6SpBQyb7Wj6aC6VoCo/KmtYSWMfCWluWpiW5IP0wI/zRive/DvQvTXvbiWu5a8n7dDd8w6vmSiXmE0OPQvyCInWH8MyGOLwxS3OW560STkKxgrCxq2u5bLZ2xWIUUVYODJxJxp/sfQn+N4sOiBpmLJZiWhub6e3dMNABQamASooPoI/E01mC8CzTfXhj38cbxV9Rad25UAqZaPDXVJihsMdYzaXht/a8/jyFqGaJ+HNpZfQ7l1jQeNbB5yHPgZ3BtEGsXUfFL5hYbXw3MYbBL7fQccOKO7eZS/sl/ahXJbYANahRr1Z85elCUtIEJmAH9AAKcWxm6U/RXceNcbSoqKfenoi+kiVH6v7RyOA9Z74v2u3S5fi63V4GuzqN5l5GEv/1rMjaHXmr/r8i+sLgOppO6/8MO0ETI7f33VtY5E90Z1WTk+/gFcioXgRMiF670EKsT/7qMykXcGhiJtXcVZOSEXAQsmbdlsKgEhr/Xmfwb1tbWrJUnMTDXpQzQ==</X509Certificate><X509Certificate>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</X509Certificate></X509Data></KeyInfo><Object Id="ts-countersig"><X509Data><X509Certificate>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</X509Certificate><X509Certificate>MIIHcTCCBVmgAwIBAgITMwAAABXF52ueAptJmQAAAAAAFTANBgkqhkiG9w0BAQsFADCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IDIwMTAwHhcNMjEwOTMwMTgyMjI1WhcNMzAwOTMwMTgzMjI1WjB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EgMjAxMDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAOThpkzntHIhC3miy9ckeb0O1YLT/e6cBwfSqWxOdcjKNVf2AX9sSuDivbk+F2Az/1xPx2b3lVNxWuJ+Slr+uDZnhUYjDLWNE893MsAQGOhgfWpSg0S3po5GawcU88V29YZQ3MFEyHFcUTE3oAo4bo3t1w/YJlN8OWECesSq/XJprx2rrPY2vjUmZNqYO7oaezOtgFt+jBAcnVL+tuhiJdxqD89d9P6OU8/W7IVWTe/dvI2k45GPsjksUZzpcGkNyjYtcI4xyDUoveO0hyTD4MmPfrVUj9z6BVWYbWg7mka97aSueik3rMvrg0XnRm7KMtXAhjBcTyziYrLNueKNiOSWrAFKu75xqRdbZ2De+JKRHh09/SDPc31BmkZ1zcRfNN0Sidb9pSB9fvzZnkXftnIv231fgLrbqn427DZM9ituqBJR6L8FA6PRc6ZNN3SUHDSCD/AQ8rdHGO2n6Jl8P0zbr17C89XYcz1DTsEzOUyOArxCaC4Q6oRRRuLRvWoYWmEBc8pnol7XKHYC4jMYctenIPDC+hIK12NvDMk2ZItboKaDIV1fMHSRlJTYuVD5C4lh8zYGNRiER9vcG9H9stQcxWv2XFJRXRLbJbqvUAV6bMURHXLvjflSxIUXk8A8FdsaN8cIFRg/eKtFtvUeh17aj54WcmnGrnu3tz5q4i6tAgMBAAGjggHdMIIB2TASBgkrBgEEAYI3FQEEBQIDAQABMCMGCSsGAQQBgjcVAgQWBBQqp1L+ZMSavoKRPEY1Kc8Q/y8E7jAdBgNVHQ4EFgQUn6cVXQBeYl2D9OXSZacbUzUZ6XIwXAYDVR0gBFUwUzBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBMGA1UdJQQMMAoGCCsGAQUFBwMIMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMAsGA1UdDwQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFNX2VsuP6KJcYmjRPZSQW9fOmhjEMFYGA1UdHwRPME0wS6BJoEeGRWh0dHA6Ly9jcmwubWljcm9zb2Z0LmNvbS9wa2kvY3JsL3Byb2R1Y3RzL01pY1Jvb0NlckF1dF8yMDEwLTA2LTIzLmNybDBaBggrBgEFBQcBAQROMEwwSgYIKwYBBQUHMAKGPmh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2kvY2VydHMvTWljUm9vQ2VyQXV0XzIwMTAtMDYtMjMuY3J0MA0GCSqGSIb3DQEBCwUAA4ICAQCdVX38Kq3hLB9nATEkW+Geckv8qW/qXBS2Pk5HZHixBpOXPTEztTnXwnE2P9pkbHzQdTltuw8x5MKP+2zRoZQYIu7pZmc6U03dmLq2HnjYNi6cqYJWAAOwBb6J6Gngugnue99qb74py27YP0h1AdkY3m2CDPVtI1TkeFN1JFe53Z/zjj3G82jfZfakVqr3lbYoVSfQJL1AoL8ZthISEV09J+BAljis9/kpicO8F7BUhUKz/AyeixmJ5/ALaoHCgRlCGVJ1ijbCHcNhcy4sa3tuPywJeBTpkbKpW99Jo3QMvOyRgNI95ko+ZjtPu4b6MhrZlvSP9pEB9s7GdP32THJvEKt1MMU0sHrYUP4KWN1APMdUbZ1jdEgssU5HLcEUBHG/ZPkkvnNtyo4JvbMBV0lUZNlz138eW0QBjloZkWsNn6Qo3GcZKCS6OEuabvshVGtqRRFHqfG3rsjoiV5PndLQTHa1V1QJsWkBRH58oWFsc/4Ku+xBZj1p/cvBQUl+fpO+y/g75LcVv7TOPqUxUYS8vwLBgqJ7Fx0ViY1w/ue10CgaiQuPNtq6TPmb/wrpNPgkNWcr4A245oyZ1uEi6vAnQj0llOZ0dFtq0Z4+7X6gMTN9vMvpe784cETRkPHIqzqKOghif9lwY1NNje6CbaUFEMFxBmoQtB1VM1izoXBm8g==</X509Certificate></X509Data><CounterSignature ts-format="cms-timestamp-message" xmlns="http://schemas.microsoft.com/xmldsig/timestamp/2003">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</CounterSignature></Object></Signature></doc>

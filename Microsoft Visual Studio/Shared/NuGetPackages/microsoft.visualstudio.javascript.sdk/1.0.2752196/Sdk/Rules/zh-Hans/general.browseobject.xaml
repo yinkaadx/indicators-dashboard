@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralBrowseObject" DisplayName="常规" PageTemplate="generic" Description="常规" xmlns="http://schemas.microsoft.com/build/2009/properties">
+    <Rule.Categories>
+        <Category Name="General" DisplayName="常规" Description="常规"/>
+    </Rule.Categories>
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" Label="Configuration" HasConfigurationCondition="false"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="FileName" DisplayName="项目文件" ReadOnly="True">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile" PersistedName="MSBuildProjectFile"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+
+    <StringProperty Name="FullPath" ReadOnly="True">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile" PersistedName="MSBuildProjectFullPath"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+</Rule>

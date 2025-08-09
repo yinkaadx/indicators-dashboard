@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="배포" Description="배포 옵션" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="시작 명령" Description="시작할 때 실행할 명령입니다."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="작업 디렉터리" Description="시작 명령의 작업 디렉터리입니다. 상대 경로는 프로젝트 루트를 기준으로 합니다. 기본적으로 프로젝트 루트입니다." Subtype="folder"/>
+</Rule>

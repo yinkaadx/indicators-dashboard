@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Let the user configure the SourceId metadata for the assets. This is useful when we have a project that produces assets that are consumed by a library 
+    that wants to pack the assets as if they were their own. Changing the source id in these assets will make them "indistinguisable" from assets that were produced by 
+    the consuming project, to the rest of the pipeline.
+    In other words, it's a way of saying there is only one "source" even if there are two physical projects.
+    -->
+    <StaticWebAssetSourceId Condition="'$(StaticWebAssetSourceId)' == ''">$(ProjectName)</StaticWebAssetSourceId>
+
+    <!-- Let the user configure the base path for the assets. This is used to define a prefix inside the wwwroot where all the files
+      must be located. For example, if the output is a file index.js, the consuming project will pretend that the file is in 
+      wwwroot/_content/<<Project.Client>>/index.js 
+    -->
+    <!-- This is targeting a library, so we want to follow the same library conventions -->
+    <StaticWebAssetBasePath Condition="'$(StaticWebAssetSourceId)' != '$(ProjectName)'">_content/$(StaticWebAssetSourceId)</StaticWebAssetBasePath>
+
+    <!-- This is targeting an app, so we want to follow the app conventions -->
+    <StaticWebAssetBasePath Condition="'$(StaticWebAssetSourceId)' == '$(ProjectName)'"></StaticWebAssetBasePath>
+  </PropertyGroup>
+
+  <Target Name="GetStaticWebAssetsProjectConfiguration" Returns="@(_StaticWebAssetThisProjectConfiguration)">
+    <ItemGroup>
+      <_StaticWebAssetThisProjectConfiguration Include="$(MSBuildProjectFullPath)">
+        <Version>2</Version>
+        <Source>$(StaticWebAssetSourceId)</Source>
+        <GetBuildAssetsTargets>GetCurrentProjectBuildStaticWebAssetItems</GetBuildAssetsTargets>
+        <AdditionalBuildProperties>
+        </AdditionalBuildProperties>
+        <AdditionalBuildPropertiesToRemove>
+        </AdditionalBuildPropertiesToRemove>
+        <GetPublishAssetsTargets>GetCurrentProjectPublishStaticWebAssetItems</GetPublishAssetsTargets>
+        <AdditionalPublishProperties>
+        </AdditionalPublishProperties>
+        <AdditionalPublishPropertiesToRemove>
+        </AdditionalPublishPropertiesToRemove>
+      </_StaticWebAssetThisProjectConfiguration>
+    </ItemGroup>
+  </Target>
+  
+  <Target Name="GetCurrentProjectBuildStaticWebAssetItems" DependsOnTargets="PrepareForBuild" Returns="@(_BuildAsset)">
+    <ConvertToAbsolutePath Paths="$(DebugAssetsDirectory)">
+      <Output TaskParameter="AbsolutePaths" ItemName="_ContentRoot"/>
+    </ConvertToAbsolutePath>
+    <PropertyGroup>
+      <_ContentRootAbsolute>@(_ContentRoot)</_ContentRootAbsolute>
+    </PropertyGroup>
+    <ItemGroup>
+      <!-- If esproj has a list of files, this is the place. -->
+      <CandidateBuildAssets Include="$(DebugAssetsDirectory)\**" Condition="'$(DebugAssetsDirectory)' != ''"/>
+      <_BuildAsset Include="@(CandidateBuildAssets->'%(FullPath)')">
+        <SourceId>$(StaticWebAssetSourceId)</SourceId>
+        <SourceType>Discovered</SourceType>
+        <BasePath>$(StaticWebAssetBasePath)</BasePath>
+        <ContentRoot>$(_ContentRootAbsolute)</ContentRoot>
+        <RelativePath>%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
+        <!-- Assets with `Build` are only used during development and are never copied to the publish output. 
+        This is useful for assets that are only used during development
+        like unminified JavaScript files, source maps, etc.
+        -->
+        <AssetKind Condition="'$(StaticWebAssetSourceId)' == '$(ProjectName)'" >Build</AssetKind>
+        <!-- When the user has customized the StaticWebAssetSourceId it is because it wants to
+        pack the output from the esproj project into a nuget package as if it had generated
+        the assets itself. In this case, we want to make sure that the assets are not specific
+        to the Build or Publish steps when they are consumed as a package. This is why we
+        set the AssetMode to All.
+        -->
+        <AssetKind Condition="'$(StaticWebAssetSourceId)' != '$(ProjectName)'" >All</AssetKind>
+        <AssetMode>All</AssetMode>
+        <AssetRole>Primary</AssetRole>
+        <RelatedAsset>
+        </RelatedAsset>
+        <AssetTraitName>
+        </AssetTraitName>
+        <AssetTraitValue>
+        </AssetTraitValue>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        <CopyToPublishDirectory Condition="'$(StaticWebAssetSourceId)' == '$(ProjectName)'" >Never</CopyToPublishDirectory>
+        <CopyToPublishDirectory Condition="'$(StaticWebAssetSourceId)' != '$(ProjectName)'" >PreserveNewest</CopyToPublishDirectory>
+        <OriginalItemSpec>%(CandidatePublishAssets.Identity)</OriginalItemSpec>
+        <ResultType>StaticWebAsset</ResultType>
+      </_BuildAsset>
+      <!-- Let the consuming project know about the $(DebugAssetsDirectory) so that new assets
+      can be discovered while the web app is running without having to restart the project.
+      -->
+      <_BuildAsset Include="$(ProjectName)\$(DebugAssetsDirectory)" Condition="Exists('$(DebugAssetsDirectory)')">
+        <Source>$(StaticWebAssetSourceId)</Source>
+        <BasePath>$(StaticWebAssetBasePath)</BasePath>
+        <ContentRoot>$(_ContentRootAbsolute)</ContentRoot>
+        <Pattern>**</Pattern>
+        <ResultType>StaticWebAssetDiscoveryPattern</ResultType>
+      </_BuildAsset>
+    </ItemGroup>
+  </Target>
+  
+  <Target Name="GetCurrentProjectPublishStaticWebAssetItems" DependsOnTargets="GetCopyToPublishDirectoryItems;JavaScriptOutputGroup" Returns="@(_PublishAsset)">
+    <ItemGroup>
+      <!-- If esproj has a list of files, this is the place. -->
+      <CandidatePublishAssets Include="@(JavaScriptOutput)" Condition="'$(PublishAssetsDirectory)' != ''" />
+      <_PublishAsset Include="@(CandidatePublishAssets->'%(FullPath)')">
+        <SourceId>$(StaticWebAssetSourceId)</SourceId>
+        <SourceType>Discovered</SourceType>
+        <BasePath>$(StaticWebAssetBasePath)</BasePath>
+        <ContentRoot>$(PublishAssetsDirectory)</ContentRoot>
+        <RelativePath>%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
+        <AssetKind>Publish</AssetKind>
+        <AssetMode>All</AssetMode>
+        <AssetRole>Primary</AssetRole>
+        <RelatedAsset>
+        </RelatedAsset>
+        <AssetTraitName>
+        </AssetTraitName>
+        <AssetTraitValue>
+        </AssetTraitValue>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <OriginalItemSpec>%(CandidatePublishAssets.Identity)</OriginalItemSpec>
+        <ResultType>StaticWebAsset</ResultType>
+      </_PublishAsset>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Déployer" Description="Options de déploiement" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Commande de démarrage" Description="Commande à exécuter au démarrage"/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Répertoire de travail" Description="Répertoire de travail de la commande de démarrage. Les chemins relatifs seront relatifs à la racine du projet. Par défaut, racine du projet." Subtype="folder"/>
+</Rule>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="部署" Description="部署选项" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="启动命令" Description="启动时执行的命令。"/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="工作目录" Description="启动命令的工作目录。相对路径将相对于项目根。默认情况下，项目根目录。" Subtype="folder"/>
+</Rule>

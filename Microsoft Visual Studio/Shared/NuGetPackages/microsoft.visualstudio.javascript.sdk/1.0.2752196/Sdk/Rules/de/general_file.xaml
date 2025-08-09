@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralFile" DisplayName="Allgemein" PageTemplate="generic" Description="Allgemeine Eigenschaften des Projektelements" xmlns="http://schemas.microsoft.com/build/2009/properties">
+	<Rule.DataSource>
+		<DataSource Persistence="ProjectFile" HasConfigurationCondition="False" ItemType="{}{AnyType}"/>
+	</Rule.DataSource>
+  <DynamicEnumProperty Name="{}{ItemType}" DisplayName="Elementtyp" Description="Mit dem Elementtyp wird das Buildtool oder die Datei bestimmt." EnumProvider="ItemTypes"/>
+  <StringProperty Name="DependentUpon" Visible="False"/>
+  <BoolProperty Name="Visible" Visible="false"/>
+  <StringProperty Name="Link" Visible="false"/>
+</Rule>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="BuildProperties" PageTemplate="generic" DisplayName="빌드" Description="빌드 옵션" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="BuildCommand" DisplayName="빌드 명령" Description="프로젝트 빌드에서 실행할 명령"/>
+
+    <StringProperty Name="BuildOutputFolder" DisplayName="빌드 출력 폴더" Description="Folder where production build objects will be placed."/>
+
+    <StringProperty Name="CleanCommand" DisplayName="정리 명령" Description="프로젝트 정리에서 실행할 명령"/>
+
+    <StringProperty Name="PackageJsonDirectory" DisplayName="작업 디렉터리" Description="The package.json location. By default, the project root." Default="$(MSBuildProjectDirectory)" Subtype="folder"/>
+
+</Rule>

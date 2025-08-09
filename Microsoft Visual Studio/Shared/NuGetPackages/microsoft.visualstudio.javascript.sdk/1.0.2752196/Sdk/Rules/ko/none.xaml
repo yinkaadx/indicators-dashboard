@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="None" DisplayName="일반" PageTemplate="generic" Description="빌드 아닌 항목" xmlns="http://schemas.microsoft.com/build/2009/properties">
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False" ItemType="None"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="Identity" DisplayName="파일 이름" ReadOnly="true" Category="Misc">
+        <StringProperty.DataSource>
+            <DataSource Persistence="Intrinsic" ItemType="None" PersistedName="Identity"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+
+    <StringProperty Name="FullPath" DisplayName="전체 경로" ReadOnly="true" Category="Misc">
+        <StringProperty.DataSource>
+            <DataSource Persistence="Intrinsic" ItemType="None" PersistedName="FullPath"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+
+    <BoolProperty Name="Visible" Visible="false"/>
+    <StringProperty Name="DependentUpon" Visible="false"/>
+    <StringProperty Name="Link" Visible="false"/>
+</Rule>

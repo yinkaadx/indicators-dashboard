@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Nasazení" Description="Možnosti nasazení" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Spouštěcí příkaz" Description="Příkaz, který se má provést při spuštění."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Pracovní adresář" Description="Pracovní adresář pro spouštěcí příkaz Relativní cesty budou relativní ke kořenu projektu. Ve výchozím nastavení je kořen projektu." Subtype="folder"/>
+</Rule>

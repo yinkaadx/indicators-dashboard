@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="デプロイ" Description="デプロイ オプション" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="スタートアップ コマンド" Description="起動時に実行するコマンドです。"/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="作業ディレクトリ" Description="スタートアップ コマンドの作業ディレクトリです。相対パスはプロジェクト ルートに対する相対パスになります。既定では、プロジェクト ルートです。" Subtype="folder"/>
+</Rule>

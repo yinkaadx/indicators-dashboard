@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rule Name="LaunchJsonDebugger" DisplayName="launch.json" PageTemplate="Debugger" Description="Параметры отладчика launch.json" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.Metadata>
+        <sys:String x:Key="DebugTargetDropdownEnum">LaunchJsonTarget</sys:String>
+    </Rule.Metadata>
+    
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile"/>
+    </Rule.DataSource>
+
+    <DynamicEnumProperty Name="LaunchJsonTarget" EnumProvider="LaunchJsonDebugTargetProvider" Visible="False">
+        <DynamicEnumProperty.DataSource>
+            <DataSource Persistence="UserFile"/>
+        </DynamicEnumProperty.DataSource>
+    </DynamicEnumProperty>
+
+    <StringProperty Name="LaunchJsonFolder" DisplayName="Папка launch.json" Description="Местонахождение файла launch.json для конфигурации отладки. Относительные пути будут указываться относительно корня проекта. По умолчанию это папка VSCODE." Subtype="folder">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+</Rule>

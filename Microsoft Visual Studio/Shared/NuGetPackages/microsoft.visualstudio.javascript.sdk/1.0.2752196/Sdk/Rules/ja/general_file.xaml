@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralFile" DisplayName="全般" PageTemplate="generic" Description="プロジェクト項目全般のプロパティ" xmlns="http://schemas.microsoft.com/build/2009/properties">
+	<Rule.DataSource>
+		<DataSource Persistence="ProjectFile" HasConfigurationCondition="False" ItemType="{}{AnyType}"/>
+	</Rule.DataSource>
+  <DynamicEnumProperty Name="{}{ItemType}" DisplayName="項目の種類" Description="アイテムの種類によりビルド ツールまたはファイルが決定されます" EnumProvider="ItemTypes"/>
+  <StringProperty Name="DependentUpon" Visible="False"/>
+  <BoolProperty Name="Visible" Visible="false"/>
+  <StringProperty Name="Link" Visible="false"/>
+</Rule>

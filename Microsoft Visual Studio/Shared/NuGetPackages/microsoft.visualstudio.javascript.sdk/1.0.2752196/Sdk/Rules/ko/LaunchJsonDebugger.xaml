@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rule Name="LaunchJsonDebugger" DisplayName="launch.json" PageTemplate="Debugger" Description="launch.json 디버거 옵션" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.Metadata>
+        <sys:String x:Key="DebugTargetDropdownEnum">LaunchJsonTarget</sys:String>
+    </Rule.Metadata>
+    
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile"/>
+    </Rule.DataSource>
+
+    <DynamicEnumProperty Name="LaunchJsonTarget" EnumProvider="LaunchJsonDebugTargetProvider" Visible="False">
+        <DynamicEnumProperty.DataSource>
+            <DataSource Persistence="UserFile"/>
+        </DynamicEnumProperty.DataSource>
+    </DynamicEnumProperty>
+
+    <StringProperty Name="LaunchJsonFolder" DisplayName="launch.json Folder" Description="디버그 구성의 launch.json 파일을 찾을 수 있는 위치입니다. 상대 경로는 프로젝트 루트를 기준으로 합니다. 기본적으로 .vscode 폴더입니다." Subtype="folder">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+</Rule>

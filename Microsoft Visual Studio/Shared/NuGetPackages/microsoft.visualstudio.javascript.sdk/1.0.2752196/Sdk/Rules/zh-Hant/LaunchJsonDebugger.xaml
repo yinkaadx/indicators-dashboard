@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Rule Name="LaunchJsonDebugger" DisplayName="launch.json" PageTemplate="Debugger" Description="launch.json 偵錯工具選項" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.Metadata>
+        <sys:String x:Key="DebugTargetDropdownEnum">LaunchJsonTarget</sys:String>
+    </Rule.Metadata>
+    
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile"/>
+    </Rule.DataSource>
+
+    <DynamicEnumProperty Name="LaunchJsonTarget" EnumProvider="LaunchJsonDebugTargetProvider" Visible="False">
+        <DynamicEnumProperty.DataSource>
+            <DataSource Persistence="UserFile"/>
+        </DynamicEnumProperty.DataSource>
+    </DynamicEnumProperty>
+
+    <StringProperty Name="LaunchJsonFolder" DisplayName="launch.json 資料夾" Description="用於偵錯設定之 launch.json 檔案的位置。相對路徑會相對於專案根目錄。根據預設，是 .vscode 資料夾。" Subtype="folder">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+</Rule>

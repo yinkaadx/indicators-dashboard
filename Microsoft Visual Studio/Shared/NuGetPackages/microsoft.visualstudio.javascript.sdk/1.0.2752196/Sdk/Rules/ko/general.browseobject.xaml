@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralBrowseObject" DisplayName="일반" PageTemplate="generic" Description="일반" xmlns="http://schemas.microsoft.com/build/2009/properties">
+    <Rule.Categories>
+        <Category Name="General" DisplayName="일반" Description="일반"/>
+    </Rule.Categories>
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" Label="Configuration" HasConfigurationCondition="false"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="FileName" DisplayName="프로젝트 파일" ReadOnly="True">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile" PersistedName="MSBuildProjectFile"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+
+    <StringProperty Name="FullPath" ReadOnly="True">
+        <StringProperty.DataSource>
+            <DataSource Persistence="ProjectFile" PersistedName="MSBuildProjectFullPath"/>
+        </StringProperty.DataSource>
+    </StringProperty>
+</Rule>

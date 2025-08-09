@@ -1,0 +1,351 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|AnyCPU">
+      <Configuration>Debug</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|AnyCPU">
+      <Configuration>Release</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <!-- 
+  Selecting which version of the Tasks.dll to use. Enables us to run on both .NET Framework and .NET Core.
+  -->
+  <PropertyGroup>
+    <JSPSTasksAssemblyFile Condition="'$(MSBuildRuntimeType)' != 'Core'">$(MSBuildThisFileDirectory)..\tasks\net472\Microsoft.VisualStudio.JavaScript.Tasks.dll</JSPSTasksAssemblyFile>
+    <JSPSTasksAssemblyFile Condition="'$(MSBuildRuntimeType)' == 'Core'">$(MSBuildThisFileDirectory)..\tasks\net6.0\Microsoft.VisualStudio.JavaScript.Tasks.dll</JSPSTasksAssemblyFile>
+  </PropertyGroup>
+  
+  <!-- 
+  Adding the package.g.props generation task.
+  -->
+  <UsingTask TaskName="GeneratePackageJsonProps"
+  AssemblyFile="$(JSPSTasksAssemblyFile)"/>
+
+  <!--
+  Rule files that don't need localization go in the neutral directory to save duplicating files into each language
+  -->
+  <PropertyGroup Condition="'$(JspsXamlNeutralResourcesDirectory)' == ''">
+    <JspsXamlNeutralResourcesDirectory>$(MSBuildThisFileDirectory)Rules</JspsXamlNeutralResourcesDirectory>
+  </PropertyGroup>
+
+  <!--
+  Locate the approriate localized xaml resources based on the language ID or name.
+  The logic here matches the resource manager sufficiently to handle the fixed set of 
+  possible VS languages and directories on disk.
+  We cannot respect the exact probe order of the resource manager as this has to evaluate statically
+  and we have only LangName and LangID and no access to System.Globalization API.
+  -->
+  <PropertyGroup Condition="'$(JspsXamlResourcesDirectory)' == ''">
+    <!-- 1. Probe for exact match against LangName. (e.g. pt-BR) -->
+    <JspsXamlResourcesDirectory>$(MSBuildThisFileDirectory)Rules\$(LangName)</JspsXamlResourcesDirectory>
+
+    <!-- 2. Handle special cases of languages which would not match above or below. -->
+    <JspsXamlResourcesDirectory Condition="!Exists('$(JspsXamlResourcesDirectory)') and '$(LangID)' == '2052'">$(MSBuildThisFileDirectory)Rules\zh-Hans</JspsXamlResourcesDirectory>
+    <JspsXamlResourcesDirectory Condition="!Exists('$(JspsXamlResourcesDirectory)') and '$(LangID)' == '1028'">$(MSBuildThisFileDirectory)Rules\zh-Hant</JspsXamlResourcesDirectory>
+
+    <!-- 3. Probe for parent by taking portion the portion before the hyphen (e.g. fr-FR -> fr) -->
+    <JspsXamlResourcesDirectory Condition="!Exists('$(JspsXamlResourcesDirectory)')">$(MSBuildThisFileDirectory)Rules\$(LangName.Split('-')[0])</JspsXamlResourcesDirectory>
+
+    <!-- 4. Fall back to neutral resources if all of the above fail -->
+    <JspsXamlResourcesDirectory Condition="!Exists('$(JspsXamlResourcesDirectory)')">$(JspsXamlNeutralResourcesDirectory)</JspsXamlResourcesDirectory>
+  </PropertyGroup>
+
+  <!-- Capabilities for this project.  Conditions should be based on platform|configuration only. -->
+  <ItemGroup>
+    <ProjectCapability Include="JSProjectSystem" />
+    <ProjectCapability Include="UseFileGlobs" />
+    <ProjectCapability Include="OpenProjectFile" />
+    <ProjectCapability Include="HandlesOwnReload" />
+    <ProjectCapability Include="ProjectConfigurationsDeclaredAsItems" />
+    <ProjectCapability Include="ProjectPropertiesEditor" />
+    <ProjectCapability Include="ProjectPropertyInterception" />
+    <ProjectCapability Include="AvoidAddingProjectGuid" />
+    <!-- File nesting. -->
+    <!-- Opt into configurable file nesting. -->
+    <ProjectCapability Include="ConfigurableFileNesting" />
+    <!-- Enable file nesting. -->
+    <ProjectCapability Include="DynamicFileNesting" />
+    <ProjectCapability Include="DynamicFileNestingEnabled" />
+    <!-- Dynamically calculate nesting instead of persisting in project file. -->
+    <ProjectCapability Include="DynamicDependentFile" />
+    <!-- Use file type based icon instead of generic dependent file icon. -->
+    <ProjectCapability Include="NoGeneralDependentFileIcon" />
+  </ItemGroup>
+
+  <!-- Allow disabling of automatic default item globbing. -->
+  <PropertyGroup>
+    <EnableDefaultItems Condition=" '$(EnableDefaultItems)' == '' ">true</EnableDefaultItems>
+    <EnableDefaultTypeScriptConfigurationItems Condition=" '$(EnableDefaultTypeScriptConfigurationItems)' == '' ">true</EnableDefaultTypeScriptConfigurationItems>
+    <EnableDefaultNoneItems Condition=" '$(EnableDefaultNoneItems)' == '' ">true</EnableDefaultNoneItems>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Hiding obj folder -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**</DefaultItemExcludes>
+
+    <!-- Various files that should generally always be ignored -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*.user</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*.*proj</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*.sln</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/*.vssscc</DefaultItemExcludes>
+
+    <!-- WARNING: This pattern is there to ignore folders such as .git and .vs, but it will also match items included with a
+         relative path outside the project folder (for example "..\Shared\Shared.cs").  So be sure only to apply it to items
+         that are in the project folder. -->
+    <DefaultExcludesInProjectFolder>$(DefaultExcludesInProjectFolder);**/.*/**</DefaultExcludesInProjectFolder>
+
+    <!-- Ignore node_modules -->
+    <DefaultExcludesInProjectFolder>$(DefaultExcludesInProjectFolder);**/node_modules/**</DefaultExcludesInProjectFolder>
+
+    <!-- Items to assign to TypeScriptConfiguration. -->
+    <DefaultTypeScriptConfigurationItemIncludes>$(DefaultTypeScriptConfigurationItemIncludes);**/jsconfig.json;**/tsconfig.json</DefaultTypeScriptConfigurationItemIncludes>
+  </PropertyGroup>
+
+  <!-- Specific items to include in project even when they are in excluded directories -->
+  <PropertyGroup>
+    <!-- .vscode/launch.json -->
+    <DefaultItemForceIncludes Condition="Exists('.vscode/launch.json')">$(DefaultItemForceIncludes);.vscode/launch.json</DefaultItemForceIncludes>
+    <DefaultItemForceIncludes Condition="Exists('.vscode/tasks.json')">$(DefaultItemForceIncludes);.vscode/tasks.json</DefaultItemForceIncludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\ProjectItemsSchema.xaml;"/>
+
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\general.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\debugger_general.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\general_file.xaml">
+      <Context>File</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\scc.xaml">
+      <Context>Invisible</Context>
+    </PropertyPageSchema>
+
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\BuildProperties.xaml">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\DeployProperties.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\DebugProperties.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\ChromeDebugPropertyPage.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\EdgeDebugPropertyPage.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\NodeDebugPropertyPage.xaml;">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\LaunchJsonDebugger.xaml">
+      <Context>Project</Context>
+    </PropertyPageSchema>
+
+    <PropertyPageSchema Include="
+                        $(JspsXamlResourcesDirectory)\folder.xaml;
+                        $(JspsXamlResourcesDirectory)\none.xaml;
+                        ">
+      <Context>File;BrowseObject</Context>
+    </PropertyPageSchema>
+
+    <PropertyPageSchema Include="$(JspsXamlResourcesDirectory)\general.browseobject.xaml">
+      <Context>BrowseObject</Context>
+    </PropertyPageSchema>
+  </ItemGroup>
+
+  <!-- 
+  This property group was added simply to address some needed properties for Microsoft.Common.targets. We should not copy build output because Common.targets only 
+  handles .dlls and .exe, and we don't generate those. 
+  -->
+  <PropertyGroup>
+    <OutputPath>$(MSBuildProjectDirectory)\</OutputPath>
+    <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+    <PublishableProject>false</PublishableProject>
+    <TargetRuntime>None</TargetRuntime>
+    
+    <!-- 
+    Adding these properties to avoid breaking dependencies after renaming it.
+    -->
+    <PackageJsonDirectory Condition="'$(BuildCommandWorkingDirectory)' != ''">$(BuildCommandWorkingDirectory)</PackageJsonDirectory>
+    <PublishAssetsDirectory Condition="'$(BuildOutputFolder)' != ''">$(BuildOutputFolder)</PublishAssetsDirectory>
+     
+    <!-- If we have an output directory set, define that as the OutputPath for MSBuild to perform CopyToOutputDirectory, for instance. -->
+    <OutputPath Condition="'$(PublishAssetsDirectory)' != ''">$(PublishAssetsDirectory)</OutputPath>
+    
+    <!--Common.targets assumes we have a .exe and returns that on GetTargetPath. Altering our TargetPath to reflect our true scenario. -->
+    <TargetPath>$(OutputPath)</TargetPath>
+  </PropertyGroup>
+
+  <Target Name="CreateManifestResourceNames" />
+
+  <!-- 
+  CoreCompile is a target inside target Build on Microsoft.Common.targets that is not implemented there but allows us to personalize our compile/build flow, while 
+  executing all the other targets inside Build regularly.
+  -->
+  <Target Name="CoreCompile" DependsOnTargets="RunNpmInstall;GeneratePackageJsonProps;EvaluateNPMScripts">
+    <Exec Command="$(BuildCommand)" WorkingDirectory="$(PackageJsonDirectory)" Condition=" '$(BuildCommand)' != '' AND '$(ShouldRunBuildScript)' == 'true'"/>
+  </Target>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+
+  <PropertyGroup>
+    <!-- This property was moved from props to targets so we can access IntermediateOutputPath. -->
+    <PackagePropsPath>$(IntermediateOutputPath)\package.g.props</PackagePropsPath>
+  </PropertyGroup>
+
+  <!--
+  Importing package.g.props which is located on IntermediateOutputPath. Import does not resolve IntermediateOutputPath in relation to the project directory,
+  so in general only the second import will be used. In case the user alters IntermediateOutputPath, the first import will be used.
+  -->
+  <Import Project="$(PackagePropsPath)" Condition="Exists('$(PackagePropsPath)')" />
+  <Import Project="$(MSBuildProjectDirectory)\$(PackagePropsPath)" Condition="Exists('$(MSBuildProjectDirectory)\$(PackagePropsPath)')" />
+
+  <!-- 
+  Override to PrepareForBuild on Microsoft.Common.targets as this target tries to create folders for project outputs - but that's not necessary for our project
+  system. This was creating a warning MSB3191 for failure creating folders. We don't need it because we are not using MSBuild to build, npm build does that for us.
+  -->
+  <Target Name="PrepareForBuild" DependsOnTargets="$(PrepareForBuildDependsOn)" />
+
+  <!-- 
+  This target was added - for now - to hook our npm install to the restore phase of MSBuild. It will run before Restore (the target used when you restore a project)
+  and _GenerateProjectRestoreGraph (a target used when you restore on a solution level).
+  -->
+  <Target Name="NPMRestore" AfterTargets="Restore;_GenerateProjectRestoreGraph"/>
+
+  <!--
+  Override ResolveAssemblyReferences as it throws a warning when trying to access the AssemblyCache and we don't need any assembly.
+  -->
+  <Target
+    Name="ResolveAssemblyReferences"
+    Returns=""
+    DependsOnTargets="$(ResolveAssemblyReferencesDependsOn)" />
+
+  <!--
+  Override targets and properties which are used to resolve framework assemblies when another project references this project. 
+  This project does not depend on any framework assemblies so this can be overridden.
+  -->
+  <Target Name="GetReferenceAssemblyPaths" />
+  <Target Name="GetFrameworkPaths" />
+
+  <PropertyGroup>
+    <_TargetFrameworkDirectories />
+    <FrameworkPathOverride />
+    <TargetFrameworkDirectory />
+
+    <!-- all references (even the StdLib) come from packages -->
+    <NoStdLib>true</NoStdLib>
+
+  </PropertyGroup>
+  
+  <!--
+  Our personalized Clean. First executing any command set on CleanCommand and hooking it to BeforeClean running it before it. 
+  -->
+  <Target Name="_CleanBuildOutput" BeforeTargets="BeforeClean" DependsOnTargets="RunNpmInstall;GeneratePackageJsonProps;EvaluateNPMScripts">
+    <Exec Command="$(CleanCommand)" WorkingDirectory="$(PackageJsonDirectory)" Condition=" '$(CleanCommand)' != '' "/>
+  </Target>
+
+  <!--
+  When cloning a repo from GitHub the timestamps from package.json and package-lock.json can be the same and npm install will not run. This touches the 
+  package.json if no node_modules folder is found and assures npm install will run.
+  -->
+  <Target Name="PreNpmInstallCheck" Condition="!Exists('$(PackageJsonDirectory)\node_modules')">
+    <Touch Files="$(PackageJsonDirectory)\package.json" />
+  </Target>
+
+  <!-- 
+  This target will ensure npm install runs before our build so node_modules is there. It will check for the file .install-check inside obj folder so it
+  compares timestamps with package.json. If some alteration happened on package.json, it will run npm install again. After running, it touches the file again
+  to update the timestamp. If npm install fails, it does not touch the install-check file. You can find NpmInstallCheck on Sdk.props.
+  -->
+  <Target Name="RunNpmInstall" Condition=" $(ShouldRunNpmInstall) == 'true' " DependsOnTargets="PreNpmInstallCheck" Inputs="$(PackageJsonDirectory)\package.json" Outputs="$(NpmInstallCheck)">
+    <!-- Ensure Node.js is installed -->
+    <Exec Command="node --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="ErrorCodeNpmVersion" />
+    </Exec>
+    <Error Condition="'$(ErrorCodeNpmVersion)' != '0'" Text="Node.js is required to build and run this project. To continue, please install Node.js from https://nodejs.org/, and then restart your command prompt or IDE." />
+    <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
+    <Exec WorkingDirectory="$(PackageJsonDirectory)" Command="npm install">
+      <Output TaskParameter="ExitCode" PropertyName="ErrorCodeNpmInstall" />
+    </Exec>
+    <Touch Files="$(NpmInstallCheck)" Condition="'$(ErrorCodeNpmInstall)' == '0'" AlwaysCreate="true" />
+  </Target>
+
+  <!-- 
+  This target will read the package.json file of the project and generate the MSBuild properties for the npm scripts, so that will be accessible and
+  usable by MSBuild targets.
+  -->
+  <Target Name="GeneratePackageJsonProps" BeforeTargets="NPMRestore"
+    Inputs="$(PackageJsonDirectory)\package.json"
+    Outputs="$(PackagePropsPath)">
+    <GeneratePackageJsonProps PackageJsonPath="$(PackageJsonDirectory)\package.json" PackagePropsPath="$(PackagePropsPath)">
+     <Output TaskParameter="PackageProps" ItemName="PackageProp" />
+    </GeneratePackageJsonProps>
+
+    <CreateProperty Condition="'%(PackageProp.Value)' != ''"
+      Value="%(PackageProp.Value)">
+      <Output
+        TaskParameter="Value"
+        PropertyName="%(PackageProp.Key)" />
+    </CreateProperty>
+  </Target>
+
+  <Target Name="EvaluateNPMScripts">
+    <!--
+    For each ITaskItem coming from the target we iterate through it and assign to the correct MSBuild property. The order determines the priority
+    eg. if a package.json has a "start" and a "serve" script, the "start" script will be assigned to StartupCommand.
+    -->
+    <PropertyGroup>
+      <BuildCommand Condition="'$(BuildCommand)' == '' AND '$(PackageJsonScriptsBuild)' != ''">npm run build</BuildCommand>
+      <BuildCommand Condition="'$(BuildCommand)' == '' AND '$(PackageJsonScriptsCompile)' != ''">npm run compile</BuildCommand>
+
+      <StartupCommand Condition="'$(StartupCommand)' == '' AND '$(PackageJsonScriptsStart)' != ''">npm run start</StartupCommand>
+      <StartupCommand Condition="'$(StartupCommand)' == '' AND '$(PackageJsonScriptsServe)' != ''">npm run serve</StartupCommand>
+      <StartupCommand Condition="'$(StartupCommand)' == '' AND '$(PackageJsonScriptsDev)' != ''">npm run dev</StartupCommand>
+
+      <TestCommand Condition="'$(TestCommand)' == '' AND '$(PackageJsonScriptsTest)' != ''">npm run test</TestCommand>
+
+      <CleanCommand Condition="'$(CleanCommand)' == '' AND '$(PackageJsonScriptsClean)' != ''">npm run clean</CleanCommand>
+
+      <PublishCommand Condition="'$(PublishCommand)' == '' AND '$(PackageJsonScriptsPublish)' != ''">npm run publish</PublishCommand>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Target needed to allow dotnet run to work on .esproj -->
+  <Target Name="ComputeRunArguments" DependsOnTargets="RunNpmInstall;GeneratePackageJsonProps;EvaluateNPMScripts">
+    <PropertyGroup Condition="$([System.OperatingSystem]::IsWindows())">
+      <RunCommand>cmd</RunCommand>
+      <RunArguments>/C $(StartupCommand)</RunArguments>
+    </PropertyGroup>
+    <PropertyGroup Condition="!$([System.OperatingSystem]::IsWindows())">
+      <RunCommand>$(ShellEnvironment)</RunCommand>
+      <RunArguments>-c "$(StartupCommand)"</RunArguments>
+    </PropertyGroup>
+    <PropertyGroup>
+      <RunWorkingDirectory>$(PackageJsonDirectory)</RunWorkingDirectory>
+    </PropertyGroup>
+  </Target>
+  
+  <!-- Runs the command set for generating assets for Publish (BuildCommand) -->
+  <Target Name="_RunNpmCommandForPublishAssets" DependsOnTargets="RunNpmInstall;GeneratePackageJsonProps;EvaluateNPMScripts" BeforeTargets="GetCopyToPublishDirectoryItems">
+    <Exec Command="$(BuildCommand)" WorkingDirectory="$(PackageJsonDirectory)" Condition=" '$(BuildCommand)' != '' "/>
+  </Target>
+
+  <!-- Collecting the build output (what comes from 'npm run build' or whatever it has on BuildCommand) as an ItemGroup -->
+  <Target Name="JavaScriptOutputGroup" Returns="@(JavaScriptOutput)" DependsOnTargets="_RunNpmCommandForPublishAssets">
+    <ItemGroup Condition="'$(PublishAssetsDirectory)' != ''">
+      <_JavaScriptFiles Include="$(PublishAssetsDirectory)\**\*" />
+      <JavaScriptOutput Include="@(_JavaScriptFiles)" TemplateSubPath="%(RecursiveDir)"/>
+    </ItemGroup>
+  </Target>
+
+  <Import Project="Targets/Sdk.WebAssets.targets"/>
+</Project>

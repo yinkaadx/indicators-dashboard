@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties"
+      PageTemplate="generic"
+      DisplayName="Deploy"
+      Description="Deploy options"
+      xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False" />
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand"
+                    DisplayName="Startup Command"
+                    Description="The command to execute at startup." />
+
+    <StringProperty Name="StartupCommandWorkingDirectory"
+                    DisplayName="Working Directory"
+                    Description="The working directory for the startup command. Relative paths will be relative to the project root. By default, the project root."
+                    Subtype="folder" />
+</Rule>

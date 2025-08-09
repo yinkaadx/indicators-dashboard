@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralFile" DisplayName="일반" PageTemplate="generic" Description="프로젝트 항목 일반 속성" xmlns="http://schemas.microsoft.com/build/2009/properties">
+	<Rule.DataSource>
+		<DataSource Persistence="ProjectFile" HasConfigurationCondition="False" ItemType="{}{AnyType}"/>
+	</Rule.DataSource>
+  <DynamicEnumProperty Name="{}{ItemType}" DisplayName="항목 형식" Description="항목 종류에 따라 빌드 도구 또는 파일이 결정됩니다." EnumProvider="ItemTypes"/>
+  <StringProperty Name="DependentUpon" Visible="False"/>
+  <BoolProperty Name="Visible" Visible="false"/>
+  <StringProperty Name="Link" Visible="false"/>
+</Rule>

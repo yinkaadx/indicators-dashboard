@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Bereitstellen" Description="Bereitstellungsoptionen" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Startbefehl" Description="Der Befehl, der beim Start ausgeführt werden soll."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Arbeitsverzeichnis" Description="Das Arbeitsverzeichnis für den Startbefehl. Relative Pfade sind relativ zum Projektstamm. Standardmäßig der Projektstamm." Subtype="folder"/>
+</Rule>

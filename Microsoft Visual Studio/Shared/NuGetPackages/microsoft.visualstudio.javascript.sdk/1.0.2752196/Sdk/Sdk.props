@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="'$(MicrosoftCommonPropsHasBeenImported)' != 'true' and Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <ProjectSystemBase>$(MSBuildThisFileDirectory)</ProjectSystemBase>
+    
+    <!-- This prop enables dotnet run and restore to work on our projects. -->
+    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworkVersion>v6.0</TargetFrameworkVersion>
+    <TargetFrameworkMoniker>.NETCoreApp,Version=v6.0</TargetFrameworkMoniker>
+    <TargetFrameworkIdentifier>.NETCoreApp</TargetFrameworkIdentifier>
+    <TargetPlatformIdentifier>None</TargetPlatformIdentifier>
+    <TargetPlatformMoniker>None</TargetPlatformMoniker>
+
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+
+    <DefaultProjectTypeGuid Condition=" '$(DefaultProjectTypeGuid)' == '' ">{54a90642-561a-4bb1-a94e-469adee60c69}</DefaultProjectTypeGuid>
+    <DebuggerFlavor>ScriptDebugger</DebuggerFlavor>
+  </PropertyGroup>
+
+  <!-- Automatically include default items. -->
+  <ItemGroup Condition=" '$(EnableDefaultItems)' == 'true' ">
+    <!-- Automatically include TypeScriptConfiguration items. -->
+    <TypeScriptConfiguration Include="$(DefaultTypeScriptConfigurationItemIncludes)" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" Condition=" '$(EnableDefaultTypeScriptConfigurationItems)' == 'true' " />
+  </ItemGroup>
+
+  <!-- If EnableDefaultNoneItems, then everything else that wasn't added already will now be added as None items. -->
+  <ItemGroup Condition=" '$(EnableDefaultItems)' == 'true' And '$(EnableDefaultNoneItems)' == 'true' ">
+    <!-- Automatically include everything as None items. -->
+    <None Include="**/*" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+
+    <!-- Automatically include everything as None items. -->
+    <None Include="$(DefaultItemForceIncludes)" />
+
+    <!-- If there were any items added as anything other than None already, then remove those. -->
+    <None Remove="$(DefaultTypeScriptConfigurationItemIncludes)" Condition=" '$(EnableDefaultTypeScriptConfigurationItems)' == 'true' " />
+  </ItemGroup>
+  
+  <!-- Enable running npm install during build -->
+  <PropertyGroup>
+    <ShouldRunNpmInstall Condition=" '$(ShouldRunNpmInstall)' == '' ">true</ShouldRunNpmInstall>
+    <ShouldRunBuildScript Condition=" '$(ShouldRunBuildScript)' == '' ">true</ShouldRunBuildScript>
+    <PackageJsonDirectory Condition=" '$(PackageJsonDirectory)' == '' ">$(MSBuildProjectDirectory)\</PackageJsonDirectory>
+    <NpmInstallCheck>$(PackageJsonDirectory)package-lock.json</NpmInstallCheck>
+
+    <!-- Shell preferences for users on Linux/Mac environment. Mainly used for dotnet run. -->
+    <ShellEnvironment>sh</ShellEnvironment>
+  </PropertyGroup>
+</Project>

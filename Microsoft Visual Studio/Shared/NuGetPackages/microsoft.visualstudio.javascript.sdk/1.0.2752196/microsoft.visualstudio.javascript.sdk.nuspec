@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.VisualStudio.JavaScript.SDK</id>
+    <version>1.0.2752196</version>
+    <authors>Microsoft</authors>
+    <license type="file">LICENSE.txt</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <projectUrl>https://aka.ms/jsps</projectUrl>
+    <description>MSBuild project SDK providing support for JavaScript and TypeScript projects</description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <tags>MSBuildSdk JavaScript TypeScript</tags>
+    <packageTypes>
+      <packageType name="MSBuildSdk" />
+    </packageTypes>
+    <repository type="git" commit="d199d83153bc2536d9e65e9a02385f52c85de40a" />
+    <contentFiles>
+      <files include="any/net472/BuildProperties.xaml" buildAction="Content" />
+      <files include="any/net472/ChromeDebugPropertyPage.xaml" buildAction="Content" />
+      <files include="any/net472/debugger_general.xaml" buildAction="Content" />
+      <files include="any/net472/DebugProperties.xaml" buildAction="Content" />
+      <files include="any/net472/DeployProperties.xaml" buildAction="Content" />
+      <files include="any/net472/EdgeDebugPropertyPage.xaml" buildAction="Content" />
+      <files include="any/net472/folder.xaml" buildAction="Content" />
+      <files include="any/net472/general.browseobject.xaml" buildAction="Content" />
+      <files include="any/net472/general.xaml" buildAction="Content" />
+      <files include="any/net472/general_file.xaml" buildAction="Content" />
+      <files include="any/net472/LaunchJsonDebugger.xaml" buildAction="Content" />
+      <files include="any/net472/NodeDebugPropertyPage.xaml" buildAction="Content" />
+      <files include="any/net472/none.xaml" buildAction="Content" />
+      <files include="any/net472/ProjectItemsSchema.xaml" buildAction="Content" />
+      <files include="any/net472/scc.xaml" buildAction="Content" />
+    </contentFiles>
+  </metadata>
+</package>

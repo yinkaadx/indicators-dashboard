@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="ConfigurationGeneralFile" DisplayName="Общие" PageTemplate="generic" Description="Общие свойства элемента проекта" xmlns="http://schemas.microsoft.com/build/2009/properties">
+	<Rule.DataSource>
+		<DataSource Persistence="ProjectFile" HasConfigurationCondition="False" ItemType="{}{AnyType}"/>
+	</Rule.DataSource>
+  <DynamicEnumProperty Name="{}{ItemType}" DisplayName="Тип элемента" Description="Тип элемента определяет инструмент сборки или файл" EnumProvider="ItemTypes"/>
+  <StringProperty Name="DependentUpon" Visible="False"/>
+  <BoolProperty Name="Visible" Visible="false"/>
+  <StringProperty Name="Link" Visible="false"/>
+</Rule>

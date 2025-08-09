@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Wdrażanie" Description="Opcje wdrażania" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Polecenie uruchamiania" Description="Polecenie do wykonania podczas uruchamiania."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Katalog roboczy" Description="Katalog roboczy polecenia uruchamiania. Ścieżki względne będą względne wobec katalogu głównego projektu. Domyślnie katalog główny projektu." Subtype="folder"/>
+</Rule>

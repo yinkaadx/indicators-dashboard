@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Implementar" Description="Opciones de implementación" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Comando de inicio" Description="Comando que se va a ejecutar en el inicio."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Directorio de trabajo" Description="Directorio de trabajo para el comando de inicio. Las rutas de acceso relativas serán relativas a la raíz del proyecto. De forma predeterminada, la raíz del proyecto." Subtype="folder"/>
+</Rule>

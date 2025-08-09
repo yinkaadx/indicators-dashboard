@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Развернуть" Description="Параметры развертывания" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Команда запуска" Description="Команда, выполняемая при запуске."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Рабочая папка" Description="Рабочая папка для команды запуска. Относительные пути будут указываться относительно корня проекта. Корень проекта по умолчанию." Subtype="folder"/>
+</Rule>

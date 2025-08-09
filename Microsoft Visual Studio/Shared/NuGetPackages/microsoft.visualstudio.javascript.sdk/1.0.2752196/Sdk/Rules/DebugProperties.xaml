@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Rule Name="DebugProperties"
+      Description="Debug options."
+      DisplayName="Debug"
+      PageTemplate="generic"
+      Order="500"
+      xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile"
+                  SourceOfDefaultValue="AfterContext"
+                  HasConfigurationCondition="False" />
+    </Rule.DataSource>
+
+  <StringProperty Name="OpenLaunchProfilesEditor"
+                DisplayName="Open debug launch profiles UI"
+                Category="General">
+    <StringProperty.ValueEditors>
+      <ValueEditor EditorType="LinkAction">
+        <ValueEditor.Metadata>
+          <NameValuePair Name="Action" Value="Command" />
+          <NameValuePair Name="Command" Value="OpenLaunchProfilesEditor" />
+        </ValueEditor.Metadata>
+      </ValueEditor>
+    </StringProperty.ValueEditors>
+  </StringProperty>
+
+</Rule>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Implantar" Description="Opções de implantação" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Comando de Inicialização" Description="O comando a ser executado na inicialização."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Diretório de Trabalho" Description="O diretório de trabalho para o comando de inicialização. Os caminhos relativos serão relativos à raiz do projeto. Por padrão, a raiz do projeto." Subtype="folder"/>
+</Rule>

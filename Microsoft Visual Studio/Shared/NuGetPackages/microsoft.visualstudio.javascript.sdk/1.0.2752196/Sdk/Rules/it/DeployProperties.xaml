@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="DeployProperties" PageTemplate="generic" DisplayName="Distribuzione" Description="Opzioni di distribuzione" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="StartupCommand" DisplayName="Comando di avvio" Description="Comando da eseguire all'avvio."/>
+
+    <StringProperty Name="StartupCommandWorkingDirectory" DisplayName="Directory operativa" Description="Directory di lavoro per il comando di avvio. I percorsi relativi saranno relativi alla radice del progetto. Per impostazione predefinita, la radice del progetto." Subtype="folder"/>
+</Rule>

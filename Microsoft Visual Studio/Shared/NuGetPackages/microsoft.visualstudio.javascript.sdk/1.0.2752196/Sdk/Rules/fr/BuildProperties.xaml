@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Copyright, Microsoft Corporation, All rights reserved.-->
+<Rule Name="BuildProperties" PageTemplate="generic" DisplayName="Créer" Description="Options de build" xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+    <Rule.DataSource>
+        <DataSource Persistence="ProjectFile" HasConfigurationCondition="False"/>
+    </Rule.DataSource>
+
+    <StringProperty Name="BuildCommand" DisplayName="Commande de build" Description="Commande à exécuter lors de la génération du projet"/>
+
+    <StringProperty Name="BuildOutputFolder" DisplayName="Dossier de sortie de build" Description="Folder where production build objects will be placed."/>
+
+    <StringProperty Name="CleanCommand" DisplayName="Commande de nettoyage" Description="Commande à exécuter lors du nettoyage du projet"/>
+
+    <StringProperty Name="PackageJsonDirectory" DisplayName="Répertoire de travail" Description="The package.json location. By default, the project root." Default="$(MSBuildProjectDirectory)" Subtype="folder"/>
+
+</Rule>
