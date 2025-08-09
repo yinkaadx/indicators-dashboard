@@ -2,8 +2,5 @@ streamlit
 pandas
 numpy
 fredapi
-wbdata
-requests
 yfinance
-plotly
-lxml
+requests
