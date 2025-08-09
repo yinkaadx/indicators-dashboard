@@ -4,7 +4,6 @@ numpy
 fredapi
 wbdata
 requests
-beautifulsoup4
 yfinance
 plotly
 lxml

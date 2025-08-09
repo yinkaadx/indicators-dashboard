@@ -4,449 +4,373 @@ import numpy as np
 from fredapi import Fred
 import wbdata
 import requests
-from bs4 import BeautifulSoup
 import yfinance as yf
 import plotly.express as px
-import plotly.graph_objects as go
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-import re
+from functools import lru_cache
 
 # ──────────────────────────────────────────────────────────────────────────────
-# APP CONFIG (New look & faster behavior)
+# PAGE CONFIG • clean, airy, no pre-selection
 # ──────────────────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Econ Mirror Dashboard — v2",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Econ Mirror — Clean View", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# Minimal CSS for clean, modern cards
+# Minimal CSS
 st.markdown("""
 <style>
-/* Global */
-.reportview-container .main .block-container{padding-top:1rem;padding-bottom:2rem;}
-/* Metric cards */
-.metric-card{
-  border-radius:12px;
-  padding:14px 16px;
-  background:linear-gradient(135deg,#0f172a 0%,#111827 100%);
-  border:1px solid #1f2937;
-  color:#e5e7eb;
+/* spacing & fonts */
+.block-container { padding-top: 1rem; padding-bottom: 3rem; }
+h1, h2, h3 { color: #e5e7eb; }
+.small { color:#9ca3af; font-size:0.85rem; }
+/* hero */
+.hero {
+  padding: 18px 20px; border:1px solid #1f2937; border-radius:14px;
+  background: linear-gradient(135deg,#0b1020 0%,#0f172a 100%);
 }
-.metric-title{font-size:0.85rem;color:#9ca3af;margin-bottom:6px;}
-.metric-value{font-size:1.4rem;font-weight:700;}
-.metric-delta{font-size:0.8rem;color:#9ca3af;}
-/* Tags */
-.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-left:8px;background:#111827;border:1px solid #1f2937;color:#9ca3af;}
-/* Section headers */
-h1, h2, h3 { color:#e5e7eb; }
+/* metric strip */
+.kpi {
+  border-radius:12px; padding:14px 16px; border:1px solid #1f2937;
+  background:#0f172a; color:#e5e7eb;
+}
+.kpi .t { font-size:0.8rem; color:#9ca3af; margin-bottom:6px; }
+.kpi .v { font-size:1.6rem; font-weight:700; }
+.kpi .u { font-size:0.8rem; color:#9ca3af; }
+/* section card */
+.section {
+  padding:14px 16px; border:1px solid #1f2937; border-radius:14px; background:#0b1020;
+}
+.tag { display:inline-block; padding:2px 8px; border:1px solid #1f2937; border-radius:999px; font-size:0.75rem; color:#9ca3af; margin-right:6px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SECRETS / KEYS
+# KEYS & SESSIONS
 # ──────────────────────────────────────────────────────────────────────────────
 fred = Fred(api_key=st.secrets["FRED_API_KEY"])
 TE_KEY = st.secrets.get("TRADINGECONOMICS_API_KEY", "")
 
-# Shared requests session for connection pooling
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "Mozilla/5.0 (EconMirror/2.0)"})
+SESSION.headers.update({"User-Agent": "EconMirror/3.0"})
 TIMEOUT = 12
 
+# Region toggle (no selection required)
+region = st.segmented_control("Region", options=["United States", "Global (World)"], default="United States", help="Switch between U.S. view (FRED + TE) and Global aggregates (World Bank).")
+
 # ──────────────────────────────────────────────────────────────────────────────
-# INDICATORS, THRESHOLDS, UNITS (curated/cleaned)
+# INDICATORS & MAPPINGS
 # ──────────────────────────────────────────────────────────────────────────────
-INDICATORS = [
-    "Yield curve",
-    "Consumer confidence",
-    "Building permits",
-    "Unemployment claims",
-    "LEI (Conference Board Leading Economic Index)",
-    "GDP",
-    "Capacity utilization",
-    "Inflation",
-    "Retail sales",
-    "Nonfarm payrolls",
-    "Wage growth",
-    "P/E ratios",
-    "Credit growth",
-    "Fed funds rate",
-    "Short rates",
-    "Industrial production",
-    "Consumer/investment spending",
-    "Productivity growth",
-    "Debt-to-GDP",
-    "Foreign reserves",
-    "Real rates",
-    "Trade balance",
-    "Credit spreads",
-    "Central bank printing (M2)",
-    "Fiscal deficits",
-    "Debt growth",
-    "Income growth",
-    "Debt service",
-    "Military spending",
-    "Debt burden"
+# US indicators (curated to avoid congestion)
+US_INDICATORS = [
+    "GDP", "Inflation", "Unemployment rate", "Nonfarm payrolls",
+    "Retail sales", "Fed funds rate", "Industrial production", "Credit spreads",
+    "Yield curve", "Building permits", "Wage growth", "Capacity utilization",
+    "Debt-to-GDP", "Debt service", "M2 (money supply)"
 ]
 
-THRESHOLDS = {
-    "Yield curve": "10Y-2Y > 1%",
-    "Consumer confidence": "> 90",
-    "Building permits": "+5% YoY",
-    "Unemployment claims": "-10% YoY",
-    "LEI (Conference Board Leading Economic Index)": "↑ 1–2%",
-    "GDP": "2–4% YoY",
-    "Capacity utilization": "> 80%",
-    "Inflation": "2–3%",
-    "Retail sales": "+3–5% YoY",
-    "Nonfarm payrolls": "+150K / month",
-    "Wage growth": "> 3% YoY",
-    "P/E ratios": "20+ = high",
-    "Credit growth": "> 5% YoY",
-    "Fed funds rate": "Trend ↓ (easing)",
-    "Short rates": "Trend ↑ (tightening)",
-    "Industrial production": "+2–5% YoY",
-    "Consumer/investment spending": "Positive growth",
-    "Productivity growth": "> 3% YoY",
-    "Debt-to-GDP": "< 60%",
-    "Foreign reserves": "↑ YoY",
-    "Real rates": "< 0% = accommodative",
-    "Trade balance": "Surplus improves",
-    "Credit spreads": "Widening > 500 bps",
-    "Central bank printing (M2)": "> +10% YoY",
-    "Fiscal deficits": "> 6% GDP = high",
-    "Debt growth": "≤ Income growth",
-    "Income growth": "≥ Debt growth",
-    "Debt service": "> 20% income = high",
-    "Military spending": "> 4% GDP = high",
-    "Debt burden": "> 100% GDP = high"
-}
+# Global indicators (use World Bank aggregates)
+GLOBAL_INDICATORS = [
+    "GDP", "Inflation", "Unemployment rate", "Debt-to-GDP",
+    "Trade balance (% GDP)", "M2 growth", "GDP per capita growth", "Government spending growth"
+]
 
-UNITS = {
-    "Yield curve": "pct-pts",
-    "Consumer confidence": "Index",
-    "Building permits": "Thous.",
-    "Unemployment claims": "Thous.",
-    "LEI (Conference Board Leading Economic Index)": "Index",
-    "GDP": "USD bn (SAAR)",
-    "Capacity utilization": "%",
-    "Inflation": "Index",
-    "Retail sales": "USD mn",
-    "Nonfarm payrolls": "Thous.",
-    "Wage growth": "%",
-    "P/E ratios": "Ratio",
-    "Credit growth": "%",
-    "Fed funds rate": "%",
-    "Short rates": "%",
-    "Industrial production": "Index",
-    "Consumer/investment spending": "USD bn",
-    "Productivity growth": "%",
-    "Debt-to-GDP": "%",
-    "Foreign reserves": "USD bn",
-    "Real rates": "%",
-    "Trade balance": "USD bn",
-    "Credit spreads": "bps",
-    "Central bank printing (M2)": "USD bn",
-    "Fiscal deficits": "% GDP",
-    "Debt growth": "%",
-    "Income growth": "%",
-    "Debt service": "% income",
-    "Military spending": "% GDP",
-    "Debt burden": "%"
-}
-
-# FRED Series map (picked for reliability/availability)
+# FRED map (US only)
 FRED_MAP = {
-    "Yield curve": "T10Y2Y",                       # 10Y minus 2Y
-    "Consumer confidence": "UMCSENT",               # U. Michigan Sentiment (proxy)
-    "Building permits": "PERMIT",                   # Total
-    "Unemployment claims": "ICSA",                  # Initial claims
-    "LEI (Conference Board Leading Economic Index)": "USSLIND",
-    "GDP": "GDP",                                   # Nominal GDP SAAR (USD bn)
-    "Capacity utilization": "TCU",
-    "Inflation": "CPIAUCSL",                        # CPI index
-    "Retail sales": "RSXFS",                        # Retail sales ex auto & gas
-    "Nonfarm payrolls": "PAYEMS",
-    "Wage growth": "AHETPI",
-    "Credit growth": "TOTBKCR",                     # Bank credit YoY proxy may require transform
-    "Fed funds rate": "FEDFUNDS",
-    "Short rates": "TB3MS",
-    "Industrial production": "INDPRO",
-    "Consumer/investment spending": "PCE",
-    "Productivity growth": "OPHNFB",
-    "Debt-to-GDP": "GFDEGDQ188S",                   # Federal debt to GDP (%)
-    "Foreign reserves": "TRESEUSM193N",             # Total reserves (approx; may be sparse for US)
-    "Real rates": "REAINTRATREARAT1YE",             # Real interest rate proxy
-    "Trade balance": "BOPGSTB",                     # Goods & Serv. Trade Balance
-    "Credit spreads": "BAMLH0A0HYM2",               # HY spread (ICE BofA)
-    "Central bank printing (M2)": "M2SL",
-    "Fiscal deficits": "FYFSD",                     # Federal Surplus or Deficit
-    "Debt growth": "GFDEBTN",                       # Level (we show change)
-    "Income growth": "A067RO1Q156NBEA",             # DPI
-    "Debt service": "TDSP",
-    "Military spending": "A063RC1Q027SBEA",         # Nat. defense outlays
-    "Debt burden": "GFDEBTN"
+    "GDP": "GDP",                                # USD bn SAAR
+    "Inflation": "CPIAUCSL",                     # CPI index
+    "Unemployment rate": "UNRATE",               # %
+    "Nonfarm payrolls": "PAYEMS",                # thousands
+    "Retail sales": "RSXFS",                     # USD mn
+    "Fed funds rate": "FEDFUNDS",                # %
+    "Industrial production": "INDPRO",           # index
+    "Credit spreads": "BAMLH0A0HYM2",            # bps (ICE BofA HY)
+    "Yield curve": "T10Y2Y",                     # pct-pts
+    "Building permits": "PERMIT",                # thousands
+    "Wage growth": "AHETPI",                     # dollars/hour idx
+    "Capacity utilization": "TCU",               # %
+    "Debt-to-GDP": "GFDEGDQ188S",                # %
+    "Debt service": "TDSP",                      # % income
+    "M2 (money supply)": "M2SL"                  # USD bn
+}
+
+# Display units
+UNITS_US = {
+    "GDP": "USD bn (SAAR)", "Inflation": "Index", "Unemployment rate": "%", "Nonfarm payrolls": "Thous.",
+    "Retail sales": "USD mn", "Fed funds rate": "%", "Industrial production": "Index", "Credit spreads": "bps",
+    "Yield curve": "pct-pts", "Building permits": "Thous.", "Wage growth": "Index", "Capacity utilization": "%",
+    "Debt-to-GDP": "%", "Debt service": "% income", "M2 (money supply)": "USD bn"
+}
+
+# World Bank codes (Global aggregates)
+WB_GLOBAL = {
+    "GDP": "NY.GDP.MKTP.CD",                         # USD current
+    "Inflation": "FP.CPI.TOTL.ZG",                   # % YoY
+    "Unemployment rate": "SL.UEM.TOTL.ZS",           # % labor force
+    "Debt-to-GDP": "GC.DOD.TOTL.GD.ZS",              # % of GDP
+    "Trade balance (% GDP)": "NE.RSB.GNFS.ZS",       # % of GDP
+    "M2 growth": "FM.LBL.BMNY.ZG",                   # % YoY
+    "GDP per capita growth": "NY.GDP.PCAP.KD.ZG",    # % YoY
+    "Government spending growth": "NE.CON.GOVT.KD.ZG" # % YoY
+}
+WB_UNITS = {
+    "GDP": "USD tn", "Inflation": "% YoY", "Unemployment rate": "%", "Debt-to-GDP": "% of GDP",
+    "Trade balance (% GDP)": "% of GDP", "M2 growth": "% YoY", "GDP per capita growth": "% YoY",
+    "Government spending growth": "% YoY"
+}
+WB_COUNTRY = {"United States": "USA", "Global (World)": "WLD"}
+
+# Thresholds (concise badges)
+THRESHOLDS = {
+    "GDP": "2–4% YoY (healthy)", "Inflation": "2–3% (target-ish)", "Unemployment rate": "3–5% (low)",
+    "Nonfarm payrolls": "+150K/m (steady)", "Retail sales": "+3–5% YoY", "Fed funds rate": "Cutting=easing",
+    "Industrial production": "+2–5% YoY", "Credit spreads": ">500 bps = stress",
+    "Yield curve": ">+1 pct-pt = steep", "Building permits": "+5% YoY", "Wage growth": ">3% YoY",
+    "Capacity utilization": ">80%", "Debt-to-GDP": "<60%", "Debt service": "<=20% income",
+    "M2 (money supply)": "+10% YoY = easing", "Trade balance (% GDP)": "Higher=improving",
+    "M2 growth": "3–8% YoY", "GDP per capita growth": "≥2% YoY", "Government spending growth": "Stable"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CACHING
+# HELPERS • Caching without threads
 # ──────────────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=6*60*60)  # 6 hours
+@st.cache_data(ttl=6*60*60)
 def fred_series(series_id: str):
     s = fred.get_series(series_id)
-    info = fred.get_series_info(series_id)
-    return s, info
+    return s
 
 @st.cache_data(ttl=6*60*60)
-def te_fetch(indicator_slug: str):
+def fred_series_last2(series_id: str):
+    s = fred_series(series_id).dropna()
+    if len(s) == 0:
+        return np.nan, np.nan
+    curr = float(s.iloc[-1])
+    prev = float(s.iloc[-2]) if len(s) > 1 else np.nan
+    return curr, prev
+
+@st.cache_data(ttl=6*60*60)
+def wb_last2(code: str, country_code: str):
+    df = wbdata.get_dataframe({code: "val"}, country=country_code, convert_date=True)
+    df = df.dropna().sort_index()
+    if df.empty:
+        return np.nan, np.nan
+    curr = float(df.iloc[-1]["val"])
+    prev = float(df.iloc[-2]["val"]) if len(df) > 1 else np.nan
+    return curr, prev
+
+@st.cache_data(ttl=6*60*60)
+def te_fetch(indicator_slug: str, country_slug: str):
     if not TE_KEY:
         return None
-    # TE: indicator for US with forecast where available
-    url = f"https://api.tradingeconomics.com/indicators/country/united-states?indicator={indicator_slug}&c={TE_KEY}"
+    url = f"https://api.tradingeconomics.com/indicators/country/{country_slug}?indicator={indicator_slug}&c={TE_KEY}"
     try:
-        r = SESSION.get(url, timeout=TIMEOUT)
+        r = SESSION.get(url, timeout=12)
         if r.ok:
-            data = r.json()
-            if isinstance(data, list) and len(data) > 0:
-                # Return the first most recent
-                return data[0]
+            js = r.json()
+            if isinstance(js, list) and js:
+                return js[0]
     except Exception:
         return None
     return None
 
-@st.cache_data(ttl=6*60*60)
-def yf_pe_ratio():
-    # Try S&P 500 trailing PE via yfinance metadata (may be None sometimes)
-    try:
-        spx = yf.Ticker("^GSPC")
-        val = spx.info.get("trailingPE", np.nan)
-        if val is None:
-            val = np.nan
-        return float(val)
-    except Exception:
-        return np.nan
+def slugify(name: str):
+    return name.lower().replace(" ", "-").replace("/", "-").replace("(", "").replace(")", "").replace(">", "")
+
+def fmt(value: float, unit: str, region: str, indicator: str):
+    if pd.isna(value):
+        return "—"
+    # Special format for GDP (Global to trillions)
+    if indicator == "GDP" and region == "Global (World)":
+        return f"{value/1e12:.2f} {WB_UNITS['GDP']}"
+    if indicator == "GDP" and region == "United States":
+        return f"{value:.0f} {UNITS_US['GDP']}"
+    if unit in ("USD mn","USD bn (SAAR)","USD bn"):
+        return f"{value:,.0f} {unit}"
+    if unit in ("Index",):
+        return f"{value:.2f} {unit}"
+    if "pct-pts" in unit:
+        return f"{value:.2f} {unit}"
+    if "%" in unit:
+        return f"{value:.2f} {unit}"
+    if unit in ("Thous.",):
+        return f"{value:.0f} {unit}"
+    return f"{value:.2f} {unit}"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# DATA FETCH LOGIC (Fast + parallel, fewer blocking calls)
+# DATA LOAD (sequential, cached)
 # ──────────────────────────────────────────────────────────────────────────────
-def _slugify(name: str) -> str:
-    return (
-        name.lower()
-        .replace(">", "")
-        .replace("(", "")
-        .replace(")", "")
-        .replace("/", "-")
-        .replace(" ", "-")
-    )
+if region == "United States":
+    indicators = US_INDICATORS
+else:
+    indicators = GLOBAL_INDICATORS
 
-def compute_delta(prev, curr):
-    if pd.isna(prev) or pd.isna(curr):
-        return np.nan
-    try:
-        return curr - prev
-    except Exception:
-        return np.nan
+rows = []
+country_slug = "united-states" if region == "United States" else "world"
+wb_country = WB_COUNTRY[region]
 
-def get_indicator_row(indicator: str):
-    source = "FRED"
+for ind in indicators:
+    unit = UNITS_US.get(ind, WB_UNITS.get(ind, ""))
     current = np.nan
     previous = np.nan
     forecast = np.nan
-    meta_title = indicator
-    last_updated = None
+    source = ""
+    chart_series_id = None
 
-    if indicator == "P/E ratios":
-        pe = yf_pe_ratio()
-        current = pe
-        previous = np.nan if pd.isna(pe) else max(pe - 0.5, 0)  # synthetic small delta
-        source = "yfinance (^GSPC trailingPE)"
-    else:
-        series_id = FRED_MAP.get(indicator, "")
-        if series_id:
+    if region == "United States":
+        if ind in FRED_MAP:
+            chart_series_id = FRED_MAP[ind]
             try:
-                s, info = fred_series(series_id)
-                s = s.dropna()
-                if len(s) > 0:
-                    current = float(s.iloc[-1])
-                    previous = float(s.iloc[-2]) if len(s) > 1 else np.nan
-                meta_title = info.get("title", indicator)
-                last_updated = info.get("last_updated", "")
+                current, previous = fred_series_last2(FRED_MAP[ind])
+                source = "FRED"
             except Exception as e:
-                source = f"FRED Fallback ({e})"
-
-        # Forecast fallback via TE (if available)
-        te = te_fetch(_slugify(indicator))
+                source = f"FRED error: {e}"
+        # modest forecast try via TE
+        te = te_fetch(slugify(ind), country_slug)
         if te:
             try:
-                # If FRED failed to populate, fill from TE
                 if pd.isna(current) and te.get("Last") is not None:
-                    current = float(te.get("Last"))
+                    current = float(te["Last"])
                 if pd.isna(previous) and te.get("Previous") is not None:
-                    previous = float(te.get("Previous"))
+                    previous = float(te["Previous"])
                 if te.get("Forecast") is not None:
-                    forecast = float(te.get("Forecast"))
-                source = source + " + TE" if source != "TE" else "TE"
+                    forecast = float(te["Forecast"])
+                source = "FRED + TE" if "FRED" in source else "TE"
             except Exception:
                 pass
+        # PE example removed to avoid unreliable noise; could be added as separate tile if needed.
 
-    delta = compute_delta(previous, current)
-    return {
-        "indicator": indicator,
-        "title": meta_title,
+    else:  # Global
+        code = WB_GLOBAL.get(ind)
+        if code:
+            try:
+                current, previous = wb_last2(code, wb_country)
+                source = "World Bank"
+            except Exception as e:
+                source = f"World Bank error: {e}"
+        else:
+            source = "—"
+
+    delta = (current - previous) if not (pd.isna(current) or pd.isna(previous)) else np.nan
+    rows.append({
+        "indicator": ind,
+        "unit": unit,
         "current": current,
         "previous": previous,
         "delta": delta,
         "forecast": forecast,
-        "unit": UNITS.get(indicator, ""),
-        "threshold": THRESHOLDS.get(indicator, "—"),
         "source": source,
-        "last_updated": last_updated
-    }
-
-def load_indicators_parallel(indicator_list):
-    results = {}
-    with ThreadPoolExecutor(max_workers=min(8, max(1, len(indicator_list)))) as ex:
-        future_map = {ex.submit(get_indicator_row, ind): ind for ind in indicator_list}
-        for fut in as_completed(future_map):
-            ind = future_map[fut]
-            try:
-                results[ind] = fut.result()
-            except Exception as e:
-                results[ind] = {
-                    "indicator": ind, "title": ind, "current": np.nan, "previous": np.nan,
-                    "delta": np.nan, "forecast": np.nan, "unit": UNITS.get(ind, ""),
-                    "threshold": THRESHOLDS.get(ind, "—"), "source": f"Error: {e}", "last_updated": None
-                }
-    # Keep original order
-    return [results[i] for i in indicator_list]
+        "series_id": chart_series_id,
+    })
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SIDEBAR — controls & actions
+# HERO • clean headline
 # ──────────────────────────────────────────────────────────────────────────────
-st.sidebar.header("⚙️ Controls")
-
-# Quick filter search
-search = st.sidebar.text_input("Search indicators", value="")
-
-# Multi-select with filtered options
-options = [i for i in INDICATORS if search.lower() in i.lower()]
-default_selection = options[:6] if options else INDICATORS[:6]
-selected = st.sidebar.multiselect("Select indicators", options=options, default=default_selection)
-
-# Theme toggle (affects charts)
-dark_mode = st.sidebar.toggle("Dark charts", value=True)
-
-# Cache refresh
-if st.sidebar.button("🔄 Refresh data (clear cache)"):
-    st.cache_data.clear()
-    st.experimental_rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Data sources: FRED, TradingEconomics (forecast), yfinance.")
+st.markdown(f"""
+<div class="hero">
+  <h1>📊 Econ Mirror — {region}</h1>
+  <div class="small">Live macro overview. No clicks required. Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC</div>
+</div>
+""", unsafe_allow_html=True)
+st.write("")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HEADER
+# TOP STRIP • 6 key KPIs always visible (no selection)
 # ──────────────────────────────────────────────────────────────────────────────
-st.markdown(
-    f"<h1>📊 Econ Mirror Dashboard — v2 <span class='tag'>Fast</span><span class='tag'>Accurate</span><span class='tag'>Clean UI</span></h1>",
-    unsafe_allow_html=True,
-)
-st.caption("United States focus • Live indicators, trends, and forecasts (where available)")
+priority = ["GDP","Inflation","Unemployment rate","Retail sales","Fed funds rate","Industrial production"]
+priority = [p for p in priority if p in [r["indicator"] for r in rows]]
 
-# Last updated (UTC)
-st.caption(f"Last refreshed: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
+cols = st.columns(len(priority))
+for col, name in zip(cols, priority):
+    r = next(x for x in rows if x["indicator"] == name)
+    curr_txt = fmt(r["current"], r["unit"], region, name)
+    delta_txt = "—" if pd.isna(r["delta"]) else f"{r['delta']:.2f}"
+    with col:
+        st.markdown(f"""
+        <div class="kpi">
+          <div class="t">{name}</div>
+          <div class="v">{curr_txt}</div>
+          <div class="u">Δ vs prev: {delta_txt}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# Guard empty selection
-if not selected:
-    st.info("Use the sidebar to select one or more indicators.")
-    st.stop()
+st.write("")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# LOAD DATA (parallel + cached)
+# TRENDS • one large clean chart (defaults to GDP, no selection needed)
 # ──────────────────────────────────────────────────────────────────────────────
-with st.spinner("Loading indicators..."):
-    rows = load_indicators_parallel(selected)
+st.markdown("### Trends")
+default_chart = "GDP" if any(r["indicator"] == "GDP" for r in rows) else rows[0]["indicator"]
+r0 = next(x for x in rows if x["indicator"] == default_chart)
+
+if region == "United States" and r0["series_id"]:
+    try:
+        s = fred_series(r0["series_id"]).dropna()
+        df = s.to_frame(name=default_chart).reset_index()
+        df.columns = ["Date", default_chart]
+        fig = px.line(df, x="Date", y=default_chart, title=f"{default_chart} — historical trend (US)", template="plotly_dark")
+        fig.update_traces(mode="lines+markers")
+        fig.update_layout(height=420, hovermode="x unified", xaxis=dict(rangeslider=dict(visible=True)))
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.info(f"Chart unavailable: {e}")
+elif region == "Global (World)" and default_chart in WB_GLOBAL:
+    try:
+        code = WB_GLOBAL[default_chart]
+        # fetch full series for chart
+        df = wbdata.get_dataframe({code: default_chart}, country=WB_COUNTRY[region], convert_date=True).dropna().sort_index()
+        out = df.reset_index().rename(columns={"date":"Date"})
+        fig = px.line(out, x="Date", y=default_chart, title=f"{default_chart} — historical trend (Global)", template="plotly_dark")
+        fig.update_traces(mode="lines+markers")
+        fig.update_layout(height=420, hovermode="x unified", xaxis=dict(rangeslider=dict(visible=True)))
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.info(f"Chart unavailable: {e}")
+else:
+    st.info("No time-series available for the default chart in this mode.")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# OVERVIEW CARDS
+# MORE INDICATORS • decongested (collapsible)
 # ──────────────────────────────────────────────────────────────────────────────
-cols_per_row = 3
-for i in range(0, len(rows), cols_per_row):
-    chunk = rows[i:i+cols_per_row]
-    cols = st.columns(len(chunk))
-    for col, r in zip(cols, chunk):
-        delta_txt = "—" if pd.isna(r["delta"]) else f"{r['delta']:.2f} {r['unit']}"
-        curr_txt = "—" if pd.isna(r["current"]) else f"{r['current']:.2f} {r['unit']}"
-        with col:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                  <div class="metric-title">{r['title']}</div>
-                  <div class="metric-value">{curr_txt}</div>
-                  <div class="metric-delta">Δ vs prev: {delta_txt}</div>
+with st.expander("More indicators", expanded=False):
+    others = [r for r in rows if r["indicator"] not in priority]
+    if not others:
+        st.write("No additional indicators in this mode.")
+    else:
+        grid = st.columns(3)
+        for i, r in enumerate(others):
+            curr_txt = fmt(r["current"], r["unit"], region, r["indicator"])
+            delta_txt = "—" if pd.isna(r["delta"]) else f"{r['delta']:.2f}"
+            with grid[i % 3]:
+                st.markdown(f"""
+                <div class="section">
+                  <div><span class="tag">{r['source'] or '—'}</span><span class="tag">{THRESHOLDS.get(r['indicator'],'')}</span></div>
+                  <h4 style="margin-top:8px;">{r['indicator']}</h4>
+                  <div class="small">Current</div>
+                  <div style="font-size:1.2rem; font-weight:700;">{curr_txt}</div>
+                  <div class="small">Δ vs prev: {delta_txt} • Forecast: {"—" if pd.isna(r["forecast"]) else round(r["forecast"],2)}</div>
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-st.markdown("---")
+                """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# TABS: Details • Table
+# TABLE • clean summary
 # ──────────────────────────────────────────────────────────────────────────────
-tab1, tab2 = st.tabs(["📈 Details", "📋 Table"])
+st.markdown("### Table")
+df_table = pd.DataFrame([{
+    "Indicator": r["indicator"],
+    "Current": None if pd.isna(r["current"]) else (round(r["current"]/1e12,2) if (region=="Global (World)" and r["indicator"]=="GDP") else round(r["current"],2)),
+    "Previous": None if pd.isna(r["previous"]) else (round(r["previous"]/1e12,2) if (region=="Global (World)" and r["indicator"]=="GDP") else round(r["previous"],2)),
+    "Delta": None if pd.isna(r["delta"]) else round(r["delta"],2),
+    "Forecast": None if pd.isna(r["forecast"]) else round(r["forecast"],2),
+    "Unit": (WB_UNITS.get(r["indicator"], UNITS_US.get(r["indicator"], "")) if region=="Global (World)" else UNITS_US.get(r["indicator"], "")),
+    "Source": r["source"]
+} for r in rows])
 
-with tab1:
-    # Choose one indicator for deep dive
-    detail_choice = st.selectbox("Choose indicator for detailed chart", selected, index=0)
-    detail = [r for r in rows if r["indicator"] == detail_choice][0]
+st.dataframe(df_table, use_container_width=True, hide_index=True)
 
-    st.subheader(detail["title"])
-    tag_src = f"<span class='tag'>{detail['source']}</span>"
-    tag_thr = f"<span class='tag'>Threshold: {detail['threshold']}</span>"
-    if detail.get("last_updated"):
-        tag_upd = f"<span class='tag'>Last updated: {detail['last_updated']}</span>"
-    else:
-        tag_upd = ""
-    st.markdown(tag_src + tag_thr + tag_upd, unsafe_allow_html=True)
-
-    # Chart (FRED series when available)
-    series_id = FRED_MAP.get(detail_choice, "")
-    if series_id:
-        try:
-            s, info = fred_series(series_id)
-            s = s.dropna()
-            if len(s) > 0:
-                df = s.to_frame(name=detail["title"]).reset_index()
-                df.columns = ["Date", detail["title"]]
-                template = "plotly_dark" if dark_mode else "plotly_white"
-                fig = px.line(df, x="Date", y=detail["title"], title=f"{detail['title']} — Trend", template=template)
-                fig.update_traces(mode="lines+markers")
-                fig.update_layout(
-                    hovermode="x unified",
-                    xaxis=dict(rangeslider=dict(visible=True)),
-                    height=460
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("No data available for chart.")
-        except Exception as e:
-            st.warning(f"Chart unavailable: {e}")
-    else:
-        st.info("No time series available for this indicator (uses composite/fallback data).")
-
-with tab2:
-    df_table = pd.DataFrame([{
-        "Indicator": r["title"],
-        "Current": None if pd.isna(r["current"]) else round(r["current"], 2),
-        "Previous": None if pd.isna(r["previous"]) else round(r["previous"], 2),
-        "Delta": None if pd.isna(r["delta"]) else round(r["delta"], 2),
-        "Forecast": None if pd.isna(r["forecast"]) else round(r["forecast"], 2),
-        "Unit": r["unit"],
-        "Threshold": r["threshold"],
-        "Source": r["source"]
-    } for r in rows])
-    st.dataframe(df_table, use_container_width=True, hide_index=True)
+# ──────────────────────────────────────────────────────────────────────────────
+# FOOTER ACTIONS
+# ──────────────────────────────────────────────────────────────────────────────
+colA, colB = st.columns([1,1])
+with colA:
+    if st.button("🔄 Refresh data (clear cache)"):
+        st.cache_data.clear()
+        st.rerun()
+with colB:
+    st.caption("Sources: FRED, World Bank, TradingEconomics (forecast where available).")

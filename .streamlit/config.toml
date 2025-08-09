@@ -1,2 +1,6 @@
-[general]
-python_version = "3.11"
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+[theme]
+base = "dark"
