@@ -1,22 +1,23 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta, timezone
 from fredapi import Fred
-import yfinance as yf
+import wbdata
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CONFIG
+# PAGE CONFIG
 # ──────────────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Econ Mirror — Indicators Table", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Econ Mirror — Full Indicators", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("<style>.block-container{padding-top:1rem;padding-bottom:2.5rem} .stDataFrame{border:1px solid #1f2937;border-radius:10px} .muted{color:#9ca3af;font-size:0.85rem}</style>", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SECRETS
+# SECRETS / KEYS
 # ──────────────────────────────────────────────────────────────────────────────
 fred = Fred(api_key=st.secrets["FRED_API_KEY"])
 
 # ──────────────────────────────────────────────────────────────────────────────
-# INDICATORS (exactly your list, in order)
+# INDICATORS (your exact list, in order)
 # ──────────────────────────────────────────────────────────────────────────────
 INDICATORS = [
     "Yield curve",
@@ -72,7 +73,7 @@ INDICATORS = [
 ]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# THRESHOLDS (exact text you provided)
+# THRESHOLDS (your exact text)
 # ──────────────────────────────────────────────────────────────────────────────
 THRESHOLDS = {
     "Yield curve": "10Y–2Y > 1% (steepens)",
@@ -128,7 +129,7 @@ THRESHOLDS = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# UNITS (minimal; blank means not applicable/unknown)
+# UNITS (kept simple)
 # ──────────────────────────────────────────────────────────────────────────────
 UNITS = {
     "Yield curve": "pct-pts",
@@ -138,94 +139,206 @@ UNITS = {
     "LEI (Conference Board Leading Economic Index)": "Index",
     "GDP": "USD bn (SAAR)",
     "Capacity utilization": "%",
-    "Inflation": "Index",
-    "Retail sales": "USD mn",
+    "Inflation": "% YoY",
+    "Retail sales": "% YoY",
     "Nonfarm payrolls": "Thous.",
-    "Wage growth": "Index",
+    "Wage growth": "% YoY",
     "P/E ratios": "Ratio",
-    "Credit growth": "%",
-    "Fed funds futures": "%",
+    "Credit growth": "% YoY",
+    "Fed funds futures": "% (proxy: FFR)",
     "Short rates": "%",
-    "Industrial production": "Index",
+    "Industrial production": "% YoY",
     "Consumer/investment spending": "USD bn",
-    "Productivity growth": "%",
-    "Debt-to-GDP": "%",
+    "Productivity growth": "% YoY",
+    "Debt-to-GDP": "% of GDP",
     "Foreign reserves": "USD bn",
     "Real rates": "%",
     "Trade balance": "USD bn",
     "Credit spreads": "bps",
-    "Central bank printing (M2)": "USD bn",
-    "Currency devaluation": "%",
-    "Fiscal deficits": "% GDP",
-    "Debt growth": "%",
-    "Income growth": "%",
+    "Central bank printing (M2)": "% YoY",
+    "Currency devaluation": "% YoY (USD index)",
+    "Fiscal deficits": "USD bn",
+    "Debt growth": "% YoY",
+    "Income growth": "% YoY",
     "Debt service": "% income",
+    "Education investment": "% GDP",
+    "R&D patents": "Number",
+    "GDP per capita growth": "% YoY",
+    "Trade share": "% of GDP",
     "Military spending": "% GDP",
-    "Debt burden": "%"
+    "Working population": "% of total",
+    "Innovation": "% GDP (R&D spend)",
+    "GDP share": "% of world",
+    "Trade dominance": "% of world exports",
+    "Debt burden": "USD bn"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FRED SERIES MAP (US-centric proxies where possible)
+# DATA SOURCES MAPS
 # ──────────────────────────────────────────────────────────────────────────────
+# FRED series (levels OR used to compute YoY)
 FRED_MAP = {
-    "Yield curve": "T10Y2Y",
-    "Consumer confidence": "UMCSENT",
-    "Building permits": "PERMIT",
-    "Unemployment claims": "ICSA",
+    "Yield curve": "T10Y2Y",                     # pct-pts
+    "Consumer confidence": "UMCSENT",            # index
+    "Building permits": "PERMIT",                # thousands (level)
+    "Unemployment claims": "ICSA",               # thousands (level, weekly)
     "LEI (Conference Board Leading Economic Index)": "USSLIND",
-    "GDP": "GDP",
-    "Capacity utilization": "TCU",
-    "Inflation": "CPIAUCSL",
-    "Retail sales": "RSXFS",
-    "Nonfarm payrolls": "PAYEMS",
-    "Wage growth": "AHETPI",
-    "Credit growth": "TOTBKCR",
-    "Fed funds futures": "FEDFUNDS",  # proxy
-    "Short rates": "TB3MS",
-    "Industrial production": "INDPRO",
-    "Consumer/investment spending": "PCE",
-    "Productivity growth": "OPHNFB",
-    "Debt-to-GDP": "GFDEGDQ188S",
-    "Foreign reserves": "TRESEUSM193N",
-    "Real rates": "REAINTRATREARAT1YE",
-    "Trade balance": "BOPGSTB",
-    "Credit spreads": "BAMLH0A0HYM2",
-    "Central bank printing (M2)": "M2SL",
-    "Fiscal deficits": "FYFSD",
-    "Debt growth": "GFDEBTN",
-    "Income growth": "A067RO1Q156NBEA",
-    "Debt service": "TDSP",
-    "Military spending": "A063RC1Q027SBEA",
-    "Debt burden": "GFDEBTN"
-    # Others intentionally left unmapped to keep the app fast; they'll still show with thresholds.
+    "GDP": "GDP",                                # USD bn SAAR (level)
+    "Capacity utilization": "TCU",               # %
+    "Inflation": "CPIAUCSL",                     # will compute YoY %
+    "Retail sales": "RSXFS",                     # YoY %
+    "Nonfarm payrolls": "PAYEMS",                # thousands (level)
+    "Wage growth": "AHETPI",                     # YoY %
+    "Credit growth": "TOTBKCR",                  # YoY %
+    "Fed funds futures": "FEDFUNDS",             # proxy: effective rate level
+    "Short rates": "TB3MS",                      # %
+    "Industrial production": "INDPRO",           # YoY %
+    "Consumer/investment spending": "PCE",       # USD bn (level)
+    "Productivity growth": "OPHNFB",             # YoY %
+    "Debt-to-GDP": "GFDEGDQ188S",                # %
+    "Foreign reserves": "TRESEUSM193N",          # USD (approx)
+    "Real rates": "DFII10",                      # 10Y TIPS real yield %
+    "Trade balance": "BOPGSTB",                  # USD bn
+    "Credit spreads": "BAMLH0A0HYM2",            # bps
+    "Central bank printing (M2)": "M2SL",        # YoY %
+    "Currency devaluation": "DTWEXBGS",          # USD Broad Index -> YoY % (neg = deval)
+    "Fiscal deficits": "FYFSD",                  # USD bn
+    "Debt growth": "GFDEBTN",                    # YoY %
+    "Income growth": "A067RO1Q156NBEA",          # YoY %
+    "Debt service": "TDSP",                      # % income
+    "Military spending": "A063RC1Q027SBEA",      # (we'll prefer WB %GDP below if available)
+    "Debt burden": "GFDEBTN"                     # USD bn level
 }
 
+# World Bank codes (USA) for items not great on FRED
+WB_US = {
+    "Education investment": "SE.XPD.TOTL.GD.ZS",   # % GDP
+    "R&D patents": "IP.PAT.RESD",                  # number
+    "GDP per capita growth": "NY.GDP.PCAP.KD.ZG",  # % YoY
+    "Trade share": "NE.TRD.GNFS.ZS",               # Trade (% of GDP)
+    "Military spending": "MS.MIL.XPND.GD.ZS",      # % GDP (prefer this)
+    "Working population": "SP.POP.1564.TO.ZS",     # % of total
+    "Innovation": "GB.XPD.RSDV.GD.ZS",             # R&D spend % GDP
+    "Wealth gaps": "SI.POV.GINI"                   # Gini index
+}
+
+# Helper: WB country codes
+WB_USA = "USA"
+WB_WORLD = "WLD"
+
 # ──────────────────────────────────────────────────────────────────────────────
-# CACHE HELPERS
+# CACHING HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=6*60*60)
-def fred_last_two(series_id: str):
+def fred_series(series_id: str) -> pd.Series:
     s = fred.get_series(series_id)
-    s = s.dropna()
+    return s.dropna()
+
+def _nearest_year_value(s: pd.Series, ref_date: pd.Timestamp):
+    target = ref_date - timedelta(days=365)
+    if len(s.index) == 0:
+        return np.nan
+    # pick closest date not after ref_date-365 by nearest match
+    pos = s.index.get_indexer([target], method="nearest")[0]
+    return float(s.iloc[pos])
+
+@st.cache_data(ttl=6*60*60)
+def fred_last_two(series_id: str, mode: str):
+    """
+    mode: 'level' — last and previous observation (raw)
+          'yoy_pct' — YoY percent (last vs ~1yr earlier)
+    """
+    s = fred_series(series_id)
     if s.empty:
         return np.nan, np.nan
-    curr = float(s.iloc[-1])
-    prev = float(s.iloc[-2]) if len(s) > 1 else np.nan
+    if mode == "level":
+        curr = float(s.iloc[-1])
+        prev = float(s.iloc[-2]) if len(s) > 1 else np.nan
+        return curr, prev
+    else:
+        last_date = pd.to_datetime(s.index[-1])
+        last_val = float(s.iloc[-1])
+        prev_val = _nearest_year_value(s, last_date)
+        if np.isnan(prev_val) or prev_val == 0:
+            return np.nan, np.nan
+        curr_yoy = (last_val/prev_val - 1.0) * 100.0
+        # previous YoY one observation earlier
+        if len(s) > 1:
+            prev_date = pd.to_datetime(s.index[-2])
+            prev_last = float(s.iloc[-2])
+            prev_prev = _nearest_year_value(s, prev_date)
+            prev_yoy = (prev_last/prev_prev - 1.0) * 100.0 if prev_prev not in (0, np.nan) else np.nan
+        else:
+            prev_yoy = np.nan
+        return curr_yoy, prev_yoy
+
+@st.cache_data(ttl=6*60*60)
+def wb_last_two(code: str, country: str):
+    df = wbdata.get_dataframe({code: "val"}, country=country, convert_date=True)
+    df = df.dropna().sort_index()
+    if df.empty:
+        return np.nan, np.nan
+    curr = float(df.iloc[-1]["val"])
+    prev = float(df.iloc[-2]["val"]) if len(df) > 1 else np.nan
     return curr, prev
 
 @st.cache_data(ttl=6*60*60)
-def spx_trailing_pe():
-    try:
-        t = yf.Ticker("^GSPC")
-        pe = t.info.get("trailingPE", np.nan)
-        if pe is None:
-            return np.nan
-        return float(pe)
-    except Exception:
-        return np.nan
+def wb_share_of_world(code: str):
+    """Return USA% of world for the given code (e.g., GDP, exports)."""
+    us = wbdata.get_dataframe({code: "val"}, country=WB_USA, convert_date=True).dropna().sort_index()
+    wd = wbdata.get_dataframe({code: "val"}, country=WB_WORLD, convert_date=True).dropna().sort_index()
+    if us.empty or wd.empty:
+        return np.nan, np.nan
+    # align years
+    common = us.join(wd, lsuffix="_us", rsuffix="_w").dropna()
+    if common.empty:
+        return np.nan, np.nan
+    curr = float(common.iloc[-1]["val_us"]) / float(common.iloc[-1]["val_w"]) * 100.0
+    prev = float(common.iloc[-2]["val_us"]) / float(common.iloc[-2]["val_w"]) * 100.0 if len(common) > 1 else np.nan
+    return curr, prev
 
 # ──────────────────────────────────────────────────────────────────────────────
-# BUILD TABLE (no selections, all 50 rows)
+# TRANSFORMS per indicator
+# ──────────────────────────────────────────────────────────────────────────────
+# How to compute current/previous for FRED items
+FRED_MODE = {
+    "Yield curve": "level",
+    "Consumer confidence": "level",
+    "Building permits": "level",
+    "Unemployment claims": "level",
+    "LEI (Conference Board Leading Economic Index)": "level",
+    "GDP": "level",                     # keep level to match Unit
+    "Capacity utilization": "level",
+    "Inflation": "yoy_pct",
+    "Retail sales": "yoy_pct",
+    "Nonfarm payrolls": "level",
+    "Wage growth": "yoy_pct",
+    "Credit growth": "yoy_pct",
+    "Fed funds futures": "level",       # proxy: FEDFUNDS level
+    "Short rates": "level",
+    "Industrial production": "yoy_pct",
+    "Consumer/investment spending": "level",
+    "Productivity growth": "yoy_pct",
+    "Debt-to-GDP": "level",
+    "Foreign reserves": "level",
+    "Real rates": "level",
+    "Trade balance": "level",
+    "Credit spreads": "level",
+    "Central bank printing (M2)": "yoy_pct",
+    "Currency devaluation": "yoy_pct",
+    "Fiscal deficits": "level",
+    "Debt growth": "yoy_pct",
+    "Income growth": "yoy_pct",
+    "Debt service": "level",
+    "Military spending": "level",       # may be replaced by WB %GDP
+    "Debt burden": "level"
+}
+
+# Items we enrich via World Bank (USA)
+WB_ITEMS = set(WB_US.keys()) | {"GDP share", "Trade dominance", "Economic output share", "Wealth gaps"}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# BUILD TABLE (all 50 rows, thresholds always visible)
 # ──────────────────────────────────────────────────────────────────────────────
 rows = []
 for ind in INDICATORS:
@@ -234,26 +347,55 @@ for ind in INDICATORS:
     previous = np.nan
     source = "—"
 
-    if ind == "P/E ratios":
-        pe = spx_trailing_pe()
-        if not np.isnan(pe):
-            current = pe
-            previous = np.nan
-            source = "yfinance (^GSPC trailingPE)"
-    elif ind in FRED_MAP:
+    # 1) Prefer World Bank for certain indicators (USA values where applicable)
+    if ind in WB_US:
         try:
-            current, previous = fred_last_two(FRED_MAP[ind])
-            source = "FRED"
+            current, previous = wb_last_two(WB_US[ind], WB_USA)
+            source = "World Bank (USA)"
+            # Make sure unit aligns for Innovation/Military spending/Trade share etc.
+        except Exception as e:
+            source = f"WB error: {e}"
+
+    # 2) Derived shares vs world (GDP share, Trade dominance, Economic output share)
+    elif ind in ("GDP share", "Economic output share"):
+        try:
+            current, previous = wb_share_of_world("NY.GDP.MKTP.CD")  # Current USD
+            source = "World Bank (USA/World)"
+            unit = "% of world"
+        except Exception as e:
+            source = f"WB share error: {e}"
+
+    elif ind == "Trade dominance":
+        try:
+            current, previous = wb_share_of_world("NE.EXP.GNFS.CD")  # Exports current USD
+            source = "World Bank (USA/World)"
+            unit = "% of world exports"
+        except Exception as e:
+            source = f"WB share error: {e}"
+
+    # 3) FRED for everything mapped
+    if np.isnan(current) and ind in FRED_MAP:
+        mode = FRED_MODE.get(ind, "level")
+        try:
+            current, previous = fred_last_two(FRED_MAP[ind], mode)
+            source = "FRED" if source == "—" else (source + " + FRED")
         except Exception as e:
             source = f"FRED error: {e}"
 
-    delta = (current - previous) if not (np.isnan(current) or np.isnan(previous)) else np.nan
+    # Some items intentionally have no stable public series; they still show thresholds.
+    # (Asset prices > traditional metrics, New buyers entering, Internal conflicts,
+    #  Reserve currency usage dropping, Military losses, Corruption index,
+    #  Education (PISA scores), Power index, Competitiveness index/WEF)
 
+    # Compute delta
+    delta = (current - previous) if (pd.notna(current) and pd.notna(previous)) else np.nan
+
+    # Append row
     rows.append({
         "Indicator": ind,
-        "Current": None if np.isnan(current) else round(current, 2),
-        "Previous": None if np.isnan(previous) else round(previous, 2),
-        "Delta": None if np.isnan(delta) else round(delta, 2),
+        "Current": None if pd.isna(current) else round(current, 2),
+        "Previous": None if pd.isna(previous) else round(previous, 2),
+        "Delta": None if pd.isna(delta) else round(delta, 2),
         "Unit": unit,
         "Threshold": THRESHOLDS.get(ind, "—"),
         "Source": source
@@ -265,8 +407,8 @@ df = pd.DataFrame(rows)
 # UI
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown("## 📊 Econ Mirror — Full Indicator Table")
-st.caption("All indicators shown below with thresholds. Data populated where reliable US proxies exist; others show thresholds only.")
+st.caption("All indicators shown. Thresholds always visible. Data fused from FRED + World Bank (USA) where reliable; others show thresholds only.")
 
 st.dataframe(df, use_container_width=True, hide_index=True)
 
-st.markdown('<div class="muted">Tip: Click a column header to sort. Use the column menu to filter.</div>', unsafe_allow_html=True)
+st.markdown('<div class="muted">Tip: sort/filter from the column headers • Last refresh: ' + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") + ' UTC</div>', unsafe_allow_html=True)
