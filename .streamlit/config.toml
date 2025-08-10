@@ -1,6 +1,7 @@
-[server]
-headless = true
-enableCORS = false
-enableXsrfProtection = true
 [theme]
-base = "dark"
+base="dark"
+primaryColor="#5C9DFF"
+backgroundColor="#0B1220"
+secondaryBackgroundColor="#111A2E"
+textColor="#E6EEF7"
+font="sans serif"
