@@ -6,12 +6,13 @@ from fredapi import Fred
 import wbdata
 import requests
 import os
+from typing import Tuple, Any
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Econ Mirror — Full Indicators (Mirrors pinned, WB fixed)",
+    page_title="Econ Mirror — Full Indicators (Hardened)",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -23,8 +24,36 @@ st.markdown("<style>.block-container{padding-top:1rem;padding-bottom:2.5rem} .st
 # ──────────────────────────────────────────────────────────────────────────────
 fred = Fred(api_key=st.secrets["FRED_API_KEY"])
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "EconMirror/4.3-WBfix"})
+SESSION.headers.update({"User-Agent": "EconMirror/4.4-Hardened"})
 DATA_DIR = "data"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# UTILS (safe coercion / NaN checks)
+# ──────────────────────────────────────────────────────────────────────────────
+def to_float(x: Any) -> float:
+    try:
+        if x is None or (isinstance(x, float) and pd.isna(x)):
+            return np.nan
+        # guard against lists like [value]
+        if isinstance(x, (list, tuple)) and len(x) == 1:
+            x = x[0]
+        return float(x)
+    except Exception:
+        return np.nan
+
+def is_nan(x: Any) -> bool:
+    return pd.isna(x)
+
+def latest_prev_from_df(df: pd.DataFrame, col_value: str, col_time: str) -> Tuple[float, float]:
+    if df is None or df.empty or col_value not in df.columns:
+        return np.nan, np.nan
+    if col_time in df.columns:
+        df = df.sort_values(col_time)
+    else:
+        df = df.sort_index()
+    curr = to_float(df.iloc[-1][col_value])
+    prev = to_float(df.iloc[-2][col_value]) if len(df) > 1 else np.nan
+    return curr, prev
 
 # ──────────────────────────────────────────────────────────────────────────────
 # LIST (originals kept; proxies in brackets where applicable)
@@ -162,23 +191,22 @@ UNITS = {
 # SERIES MAPS
 # ──────────────────────────────────────────────────────────────────────────────
 FRED_MAP = {
-    "Yield curve": "T10Y2Y", "Consumer confidence": "UMCSENT", "Building permits": "PERMIT",
-    "Unemployment claims": "ICSA", "LEI (Conference Board Leading Economic Index)": "USSLIND",
-    "GDP": "GDP", "Capacity utilization": "TCU", "Inflation": "CPIAUCSL", "Retail sales": "RSXFS",
-    "Nonfarm payrolls": "PAYEMS", "Wage growth": "AHETPI", "Credit growth": "TOTBKCR",
-    "Fed funds futures": "FEDFUNDS", "Short rates": "TB3MS", "Industrial production": "INDPRO",
-    "Consumer/investment spending": "PCE", "Productivity growth": "OPHNFB", "Debt-to-GDP": "GFDEGDQ188S",
-    "Foreign reserves": "TRESEUSM193N", "Real rates": "DFII10", "Trade balance": "BOPGSTB",
-    "Credit spreads": "BAMLH0A0HYM2", "Central bank printing (M2)": "M2SL", "Currency devaluation": "DTWEXBGS",
-    "Fiscal deficits": "FYFSD", "Debt growth": "GFDEBTN", "Income growth": "A067RO1Q156NBEA",
-    "Debt service": "TDSP", "Military spending": "A063RC1Q027SBEA", "Debt burden": "GFDEBTN",
-    # proxies on FRED if present:
+    "Yield curve": "T10Y2Y","Consumer confidence": "UMCSENT","Building permits": "PERMIT",
+    "Unemployment claims": "ICSA","LEI (Conference Board Leading Economic Index)": "USSLIND",
+    "GDP": "GDP","Capacity utilization": "TCU","Inflation": "CPIAUCSL","Retail sales": "RSXFS",
+    "Nonfarm payrolls": "PAYEMS","Wage growth": "AHETPI","Credit growth": "TOTBKCR",
+    "Fed funds futures": "FEDFUNDS","Short rates": "TB3MS","Industrial production": "INDPRO",
+    "Consumer/investment spending": "PCE","Productivity growth": "OPHNFB","Debt-to-GDP": "GFDEGDQ188S",
+    "Foreign reserves": "TRESEUSM193N","Real rates": "DFII10","Trade balance": "BOPGSTB",
+    "Credit spreads": "BAMLH0A0HYM2","Central bank printing (M2)": "M2SL","Currency devaluation": "DTWEXBGS",
+    "Fiscal deficits": "FYFSD","Debt growth": "GFDEBTN","Income growth": "A067RO1Q156NBEA",
+    "Debt service": "TDSP","Military spending": "A063RC1Q027SBEA","Debt burden": "GFDEBTN",
     "Asset prices > traditional metrics (Shiller CAPE)": "CAPE",
     "New buyers entering (FINRA Margin Debt — FRED proxy)": "MDSP"
 }
 FRED_MODE = {"Inflation":"yoy","Retail sales":"yoy","Wage growth":"yoy","Credit growth":"yoy","Industrial production":"yoy","Productivity growth":"yoy","Central bank printing (M2)":"yoy","Currency devaluation":"yoy"}
 
-# World Bank (USA) codes
+# WB USA codes
 WB_US = {
     "Wealth gaps (Gini, WB)": "SI.POV.GINI",
     "Education investment (WB %GDP)": "SE.XPD.TOTL.GD.ZS",
@@ -195,7 +223,7 @@ WB_US = {
 WB_USA = "USA"; WB_WORLD = "WLD"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# LOCAL MIRROR HELPERS (pinned CSVs)
+# LOCAL MIRROR HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 def read_csv_safe(path, cols):
     try:
@@ -207,15 +235,11 @@ def read_csv_safe(path, cols):
     return pd.DataFrame(columns=cols)
 
 def mirror_value_latest(path, col_value, col_year="year"):
-    df = read_csv_safe(path, [col_year, col_value]).sort_values(col_year)
-    if df.empty:
-        return np.nan, np.nan
-    curr = float(df.iloc[-1][col_value])
-    prev = float(df.iloc[-2][col_value]) if len(df) > 1 else np.nan
-    return curr, prev
+    df = read_csv_safe(path, [col_year, col_value])
+    return latest_prev_from_df(df, col_value, col_year)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ONLINE FALLBACKS (used ONLY if mirror missing)
+# ONLINE FALLBACKS (only if mirror missing)
 # ──────────────────────────────────────────────────────────────────────────────
 def imf_cofer_usd_share():
     try:
@@ -223,7 +247,7 @@ def imf_cofer_usd_share():
         js = SESSION.get(url, timeout=20).json()
         obs = js.get("CompactData",{}).get("DataSet",{}).get("Series",{}).get("Obs",[])
         if isinstance(obs, list) and obs:
-            return float(obs[-1].get("@OBS_VALUE"))
+            return to_float(obs[-1].get("@OBS_VALUE"))
     except Exception:
         return np.nan
 
@@ -234,7 +258,8 @@ def online_pisa_math_usa():
         ser = js.get("dataSets",[{}])[0].get("series",{})
         if ser:
             k = next(iter(ser)); ob = ser[k].get("observations",{})
-            idx = max(map(int, ob.keys())); return float(ob[str(idx)][0])
+            idx = max(map(int, ob.keys()))
+            return to_float(ob[str(idx)][0])
     except Exception:
         return np.nan
 
@@ -245,7 +270,7 @@ def online_cinc_usa():
     return np.nan
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FRED & WORLD BANK HELPERS (WB fixed: no convert_date, then datetime index)
+# FRED & WB HELPERS (WB fixed: no convert_date, then datetime index)
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=6*60*60)
 def fred_series(series_id: str) -> pd.Series:
@@ -253,18 +278,20 @@ def fred_series(series_id: str) -> pd.Series:
     return s.dropna()
 
 def yoy_from_series(s: pd.Series):
-    if s.empty: return np.nan, np.nan
-    last = s.iloc[-1]; ld = pd.to_datetime(s.index[-1])
+    if s.empty:
+        return np.nan, np.nan
+    last = to_float(s.iloc[-1]); ld = pd.to_datetime(s.index[-1])
     prev_idx = s.index.get_indexer([ld - timedelta(days=365)], method="nearest")[0]
-    prev = s.iloc[prev_idx]
-    if prev in (0, np.nan): return np.nan, np.nan
+    prev = to_float(s.iloc[prev_idx])
+    if is_nan(prev) or prev == 0:
+        return np.nan, np.nan
     curr = (last/prev - 1) * 100
     prev2 = np.nan
     if len(s) > 1:
-        last2 = s.iloc[-2]; ld2 = pd.to_datetime(s.index[-2])
+        last2 = to_float(s.iloc[-2]); ld2 = pd.to_datetime(s.index[-2])
         prev2_idx = s.index.get_indexer([ld2 - timedelta(days=365)], method="nearest")[0]
-        prev2_val = s.iloc[prev2_idx]
-        if prev2_val not in (0, np.nan):
+        prev2_val = to_float(s.iloc[prev2_idx])
+        if not is_nan(prev2_val) and prev2_val != 0:
             prev2 = (last2/prev2_val - 1) * 100
     return float(curr), (None if pd.isna(prev2) else float(prev2))
 
@@ -275,7 +302,7 @@ def fred_last_two(series_id: str, mode: str = "level"):
         return yoy_from_series(s)
     if s.empty:
         return np.nan, np.nan
-    return float(s.iloc[-1]), (float(s.iloc[-2]) if len(s) > 1 else np.nan)
+    return to_float(s.iloc[-1]), (to_float(s.iloc[-2]) if len(s) > 1 else np.nan)
 
 @st.cache_data(ttl=6*60*60)
 def wb_last_two(code: str, country: str):
@@ -284,9 +311,7 @@ def wb_last_two(code: str, country: str):
         return np.nan, np.nan
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()
-    cur = float(df.iloc[-1]["val"])
-    prev = float(df.iloc[-2]["val"]) if len(df) > 1 else np.nan
-    return cur, prev
+    return latest_prev_from_df(df, "val", col_time=None)
 
 @st.cache_data(ttl=6*60*60)
 def wb_share_of_world(code: str):
@@ -299,8 +324,8 @@ def wb_share_of_world(code: str):
     common = us.join(wd, lsuffix="_us", rsuffix="_w").dropna()
     if common.empty:
         return np.nan, np.nan
-    cur = float(common.iloc[-1]["val_us"]) / float(common.iloc[-1]["val_w"]) * 100
-    prev = float(common.iloc[-2]["val_us"]) / float(common.iloc[-2]["val_w"]) * 100 if len(common) > 1 else np.nan
+    cur = to_float(common.iloc[-1]["val_us"]) / to_float(common.iloc[-1]["val_w"]) * 100
+    prev = (to_float(common.iloc[-2]["val_us"]) / to_float(common.iloc[-2]["val_w"]) * 100) if len(common) > 1 else np.nan
     return cur, prev
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -311,59 +336,56 @@ for ind in INDICATORS:
     unit = UNITS.get(ind, "")
     cur = np.nan; prev = np.nan; src = "—"
 
-    # 1) Local mirrors (PISA / CINC / UCDP)
+    # Mirrors (PISA / CINC / UCDP)
     if "Education (PISA" in ind:
         cur, prev = mirror_value_latest(os.path.join(DATA_DIR, "pisa_math_usa.csv"), "pisa_math_mean_usa")
-        if not np.isnan(cur): src = "Mirror: OECD PISA"
+        if not is_nan(cur): src = "Mirror: OECD PISA"
         else:
             cur = online_pisa_math_usa()
-            if not np.isnan(cur): src = "OECD (online)"
+            if not is_nan(cur): src = "OECD (online)"
 
-    if "Power index (CINC" in ind and np.isnan(cur):
+    if "Power index (CINC" in ind and is_nan(cur):
         cur, prev = mirror_value_latest(os.path.join(DATA_DIR, "cinc_usa.csv"), "cinc_usa")
-        if not np.isnan(cur): src = "Mirror: CINC"
+        if not is_nan(cur): src = "Mirror: CINC"
         else:
             cur = online_cinc_usa()
-            if not np.isnan(cur): src = "CINC (online)"
+            if not is_nan(cur): src = "CINC (online)"
 
-    if "Military losses" in ind and np.isnan(cur):
+    if "Military losses" in ind and is_nan(cur):
         cur, prev = mirror_value_latest(os.path.join(DATA_DIR, "ucdp_battle_deaths_global.csv"), "ucdp_battle_deaths_global")
-        if not np.isnan(cur): src = "Mirror: UCDP"
+        if not is_nan(cur): src = "Mirror: UCDP"
         else:
             cur = online_ucdp_battle_deaths_global()
-            if not np.isnan(cur): src = "UCDP (online)"
+            if not is_nan(cur): src = "UCDP (online)"
 
-    # 2) World Bank (USA) mapped items
-    if ind in WB_US and np.isnan(cur):
+    # World Bank mapped items
+    if ind in WB_US and is_nan(cur):
         try:
-            cur, prev = wb_last_two(WB_US[ind], WB_USA)
-            src = "World Bank (USA)"
+            cur, prev = wb_last_two(WB_US[ind], WB_USA); src = "World Bank (USA)"
         except Exception as e:
             src = f"WB error: {e}"
 
-    # 3) Shares vs world (WB)
-    if ("GDP share" in ind or "Economic output share" in ind) and np.isnan(cur):
+    # Shares vs world
+    if ("GDP share" in ind or "Economic output share" in ind) and is_nan(cur):
         try:
-            cur, prev = wb_share_of_world("NY.GDP.MKTP.CD")
-            unit = "% of world"; src = "World Bank (USA/World)"
+            cur, prev = wb_share_of_world("NY.GDP.MKTP.CD"); unit = "% of world"; src = "World Bank (USA/World)"
         except Exception as e:
             src = f"WB share error: {e}"
 
-    if "Trade dominance" in ind and np.isnan(cur):
+    if "Trade dominance" in ind and is_nan(cur):
         try:
-            cur, prev = wb_share_of_world("NE.EXP.GNFS.CD")
-            unit = "% of world exports"; src = "World Bank (USA/World)"
+            cur, prev = wb_share_of_world("NE.EXP.GNFS.CD"); unit = "% of world exports"; src = "World Bank (USA/World)"
         except Exception as e:
             src = f"WB share error: {e}"
 
-    # 4) IMF COFER USD share (reserve currency usage)
-    if "Reserve currency usage dropping" in ind and np.isnan(cur):
+    # IMF COFER USD share
+    if "Reserve currency usage dropping" in ind and is_nan(cur):
         val = imf_cofer_usd_share()
-        if not np.isnan(val):
+        if not is_nan(val):
             cur = val; prev = np.nan; src = "IMF COFER (USD share)"
 
-    # 5) FRED for the rest (levels or YoY)
-    if np.isnan(cur) and ind in FRED_MAP:
+    # FRED (levels / YoY)
+    if is_nan(cur) and ind in FRED_MAP:
         try:
             mode = "yoy" if ind in FRED_MODE else "level"
             cur, prev = fred_last_two(FRED_MAP[ind], mode)
@@ -371,14 +393,14 @@ for ind in INDICATORS:
         except Exception as e:
             src = f"FRED error: {e}"
 
-    # compute delta
-    delta = (cur - prev) if (pd.notna(cur) and pd.notna(prev)) else np.nan
+    # Delta
+    delta = (cur - prev) if (not is_nan(cur) and not is_nan(prev)) else np.nan
 
     rows.append({
         "Indicator": ind,
-        "Current": None if pd.isna(cur) else round(cur, 2),
-        "Previous": None if pd.isna(prev) else round(prev, 2),
-        "Delta": None if pd.isna(delta) else round(delta, 2),
+        "Current": None if is_nan(cur) else round(cur, 2),
+        "Previous": None if is_nan(prev) else round(prev, 2),
+        "Delta": None if is_nan(delta) else round(delta, 2),
         "Unit": unit,
         "Threshold": THRESHOLDS.get(ind, "—"),
         "Source": src
@@ -389,7 +411,7 @@ df = pd.DataFrame(rows)
 # ──────────────────────────────────────────────────────────────────────────────
 # UI
 # ──────────────────────────────────────────────────────────────────────────────
-st.markdown("## 📊 Econ Mirror — Full Indicator Table (Mirrors pinned, WB fixed)")
-st.caption("Reads local CSV mirrors first (PISA/CINC/UCDP). World Bank helpers fixed (no convert_date). Falls back to FRED / IMF online only if needed.")
+st.markdown("## 📊 Econ Mirror — Full Indicator Table (Hardened)")
+st.caption("Mirrors first (PISA/CINC/UCDP). World Bank fixed. Safe NaN handling across all sources.")
 st.dataframe(df, use_container_width=True, hide_index=True)
 st.markdown('<div class="muted">Last refresh: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC") + "</div>", unsafe_allow_html=True)
