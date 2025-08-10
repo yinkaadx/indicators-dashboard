@@ -1,14 +1,23 @@
-env312/
-.venv/
-venv/
+# OS & editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.log
-*.tmp
-.ipynb_checkpoints/
-.streamlit/secrets.toml
-.env
-.DS_Store
-Thumbs.db
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+env312/
+# Streamlit cache (runtime only)
+.streamlit/cache/
+.streamlit/sessions/
+# Node/npm leftovers (if any)
+node_modules/
+# Not ignored: data/ (we want mirrors committed by CI)
