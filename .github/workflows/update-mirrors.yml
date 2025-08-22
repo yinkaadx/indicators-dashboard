@@ -2,37 +2,45 @@ name: Update mirrors (WB + FRED + OECD + CINC + UCDP)
 
 on:
   schedule:
-    - cron: "15 3 * * *"  # nightly at 03:15 UTC
+    - cron: "15 3 * * *"
   workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests wbdata
+          if exist requirements.txt (
+            pip install -r requirements.txt
+          ) else (
+            pip install pandas requests wbdata
+          )
 
-      - name: Fetch mirrors
-        run: |
-          python fetch_all_mirrors.py
+      - name: Run mirror fetcher
+        run: python fetch_all_mirrors.py
 
       - name: Commit & push if changed
         run: |
-          git config user.name "mirror-bot"
-          git config user.email "mirror-bot@users.noreply.github.com"
-          git add data/wb/*.csv data/fred/*.csv data/*.csv || true
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
           if git diff --cached --quiet; then
-            echo "No changes."
+            echo "No data changes to commit."
           else
             git commit -m "chore(mirrors): nightly WB+FRED+OECD+CINC+UCDP refresh"
             git push
