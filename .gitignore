@@ -21,3 +21,5 @@ env312/
 # Node/npm leftovers (if any)
 node_modules/
 # Not ignored: data/ (we want mirrors committed by CI)
+
+env312/
