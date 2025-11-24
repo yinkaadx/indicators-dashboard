@@ -3,15 +3,15 @@ from __future__ import annotations
 import io
 import os
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 import requests
 import wbdata
 
-OUT_ROOT = "data"
-OUT_WB = os.path.join(OUT_ROOT, "wb")
-OUT_FRED = os.path.join(OUT_ROOT, "fred")
+OUT_ROOT: str = "data"
+OUT_WB: str = os.path.join(OUT_ROOT, "wb")
+OUT_FRED: str = os.path.join(OUT_ROOT, "fred")
 
 os.makedirs(OUT_WB, exist_ok=True)
 os.makedirs(OUT_FRED, exist_ok=True)
@@ -19,43 +19,18 @@ os.makedirs(OUT_FRED, exist_ok=True)
 SES = requests.Session()
 SES.headers.update({"User-Agent": "EconMirror/MirrorBot"})
 
-WB_CODES: List[str] = [
-    "SI.POV.GINI",        # Gini (Wealth gaps)
-    "SE.XPD.TOTL.GD.ZS",  # Education investment %GDP
-    "IP.PAT.RESD",        # R&D patents count
-    "NY.GDP.PCAP.KD.ZG",  # GDP per capita growth
-    "NE.TRD.GNFS.ZS",     # Trade (% of GDP)
-    "MS.MIL.XPND.GD.ZS",  # Military spending %GDP
-    "SP.POP.1564.TO.ZS",  # Working population %
-    "GB.XPD.RSDV.GD.ZS",  # R&D spend %GDP (Innovation)
-    "CC.EST",             # Control of Corruption (WGI)
-    "PV.EST",             # Political Stability (WGI)
-    "LP.LPI.OVRL.XQ",     # Logistics Performance Index
-    # shares:
-    "NY.GDP.MKTP.CD",     # GDP current USD
-    "NE.EXP.GNFS.CD",     # Exports current USD
-]
-WB_COUNTRIES: List[str] = ["USA", "WLD"]
-
-FRED_SERIES: List[str] = [
-    "M2SL", "CPIAUCSL", "PAYEMS", "RSXFS", "TCU",
-    "FEDFUNDS", "TB3MS", "INDPRO", "PCE", "AHETPI",
-    "TOTBKCR", "DTWEXBGS", "BOPGSTB", "GFDEBTN", "TDSP",
-    "ICSA", "PERMIT", "USSLIND", "OPHNFB",
-]
-
-
+# -------------------- small utils --------------------
 def get_json(url: str, tries: int = 3, timeout: int = 60) -> Dict:
     for i in range(tries):
         try:
             r = SES.get(url, timeout=timeout)
             r.raise_for_status()
-            return r.json()
+            return r.json()  # type: ignore[no-any-return]
         except Exception:
             if i == tries - 1:
                 raise
             time.sleep(2)
-    return {}
+    return {}  # unreachable, for typing
 
 
 def get_text(url: str, tries: int = 3, timeout: int = 60) -> str:
@@ -68,7 +43,7 @@ def get_text(url: str, tries: int = 3, timeout: int = 60) -> str:
             if i == tries - 1:
                 raise
             time.sleep(2)
-    return ""
+    return ""  # unreachable, for typing
 
 
 def safe_to_csv(df: pd.DataFrame, path: str) -> bool:
@@ -86,7 +61,25 @@ def write_seed(path: str, flag_path: str, df: pd.DataFrame) -> None:
     print(f"[SEED] {path} rows={len(df)}")
 
 
-# -------------------- WB mirrors --------------------
+# -------------------- World Bank mirrors --------------------
+WB_CODES: List[str] = [
+    "SI.POV.GINI",
+    "SE.XPD.TOTL.GD.ZS",
+    "IP.PAT.RESD",
+    "NY.GDP.PCAP.KD.ZG",
+    "NE.TRD.GNFS.ZS",
+    "MS.MIL.XPND.GD.ZS",
+    "SP.POP.1564.TO.ZS",
+    "GB.XPD.RSDV.GD.ZS",
+    "CC.EST",
+    "PV.EST",
+    "LP.LPI.OVRL.XQ",
+    "NY.GDP.MKTP.CD",
+    "NE.EXP.GNFS.CD",
+]
+WB_COUNTRIES: List[str] = ["USA", "WLD"]
+
+
 def save_wb(country: str, code: str) -> None:
     try:
         df = wbdata.get_dataframe({code: "val"}, country=country).dropna()
@@ -110,6 +103,29 @@ def fetch_all_wb() -> None:
 
 
 # -------------------- FRED mirrors (public CSV) --------------------
+FRED_SERIES: List[str] = [
+    "M2SL",
+    "CPIAUCSL",
+    "PAYEMS",
+    "RSXFS",
+    "TCU",
+    "FEDFUNDS",
+    "TB3MS",
+    "INDPRO",
+    "PCE",
+    "AHETPI",
+    "TOTBKCR",
+    "DTWEXBGS",
+    "BOPGSTB",
+    "GFDEBTN",
+    "TDSP",
+    "ICSA",
+    "PERMIT",
+    "USSLIND",
+    "OPHNFB",
+]
+
+
 def save_fred_csv(series_id: str) -> None:
     try:
         url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
@@ -117,8 +133,7 @@ def save_fred_csv(series_id: str) -> None:
         path = os.path.join(OUT_FRED, f"{series_id}.csv")
         with open(path, "w", encoding="utf-8") as f:
             f.write(txt)
-        rows = max(0, len(txt.splitlines()) - 1)
-        print(f"[FRED] {path} rows={rows}")
+        print(f"[FRED] {path} rows={max(0, len(txt.splitlines()) - 1)}")
         time.sleep(0.35)
     except Exception as e:
         print(f"[FRED] {series_id} error: {e}")
@@ -134,89 +149,73 @@ def fetch_pisa_math_usa() -> None:
     path = os.path.join(OUT_ROOT, "pisa_math_usa.csv")
     flag = path + ".SEED"
 
-    # Try 2022
+    # Attempt official OECD APIs (dataset names can change; we try known ones)
     try:
-        js = get_json(
-            "https://stats.oecd.org/sdmx-json/data/PISA_2022/MATH.MEAN.USA.A.T?_format=json",
-            tries=2,
-            timeout=60,
-        )
-        ser = js.get("dataSets", [{}])[0].get("series", {})
-        if ser:
-            k = next(iter(ser))
-            ob = ser[k].get("observations", {})
-            years = sorted([int(y) for y in ob.keys()])
-            vals = [float(ob[str(y)][0]) for y in years]
+        url = "https://stats.oecd.org/sdmx-json/data/PISA_2022/MATH.MEAN.USA.A.T?_format=json"
+        js = get_json(url, tries=2, timeout=60)
+        series = js.get("dataSets", [{}])[0].get("series", {})
+        if series:
+            any_key = next(iter(series))
+            obs = series[any_key].get("observations", {})
+            years = sorted([int(y) for y in obs.keys()])
+            vals = [float(obs[str(y)][0]) for y in years]
             df = pd.DataFrame({"year": years, "pisa_math_mean_usa": vals})
-            safe_to_csv(df, path)
-            print(f"[OECD] {path} rows={len(df)}")
-            if os.path.exists(flag):
-                os.remove(flag)
-            return
-    except Exception:
-        pass
+            if safe_to_csv(df, path):
+                print(f"[OECD] {path} rows={len(df)}")
+                if os.path.exists(flag):
+                    os.remove(flag)
+                return
+    except Exception as e:
+        print(f"[OECD] 2022 error: {e}")
 
-    # Try 2018
     try:
-        js = get_json(
-            "https://stats.oecd.org/sdmx-json/data/PISA_2018/MATH.MEAN.USA.A.T?_format=json",
-            tries=2,
-            timeout=60,
-        )
-        ser = js.get("dataSets", [{}])[0].get("series", {})
-        if ser:
-            k = next(iter(ser))
-            ob = ser[k].get("observations", {})
-            years = sorted([int(y) for y in ob.keys()])
-            vals = [float(ob[str(y)][0]) for y in years]
+        url = "https://stats.oecd.org/sdmx-json/data/PISA_2018/MATH.MEAN.USA.A.T?_format=json"
+        js = get_json(url, tries=2, timeout=60)
+        series = js.get("dataSets", [{}])[0].get("series", {})
+        if series:
+            any_key = next(iter(series))
+            obs = series[any_key].get("observations", {})
+            years = sorted([int(y) for y in obs.keys()])
+            vals = [float(obs[str(y)][0]) for y in years]
             df = pd.DataFrame({"year": years, "pisa_math_mean_usa": vals})
-            safe_to_csv(df, path)
-            print(f"[OECD] {path} rows={len(df)} (2018)")
-            if os.path.exists(flag):
-                os.remove(flag)
-            return
-    except Exception:
-        pass
+            if safe_to_csv(df, path):
+                print(f"[OECD] {path} rows={len(df)} (2018)")
+                if os.path.exists(flag):
+                    os.remove(flag)
+                return
+    except Exception as e:
+        print(f"[OECD] 2018 error: {e}")
 
-    # Seed fallback (already shipped with repo)
-    if not os.path.exists(path):
-        seed = pd.DataFrame(
-            {
-                "year": [2003, 2006, 2009, 2012, 2015, 2018, 2022],
-                "pisa_math_mean_usa": [483, 474, 487, 481, 478, 478, 465],
-            }
-        )
-        write_seed(path, flag, seed)
-    else:
-        print(f"[SEED] {path} exists")
+    # Seed fallback
+    df_seed = pd.DataFrame(
+        {
+            "year": [2000, 2003, 2006, 2009, 2012, 2015, 2018],
+            "pisa_math_mean_usa": [493, 483, 474, 487, 481, 470, 478],
+        }
+    )
+    write_seed(path, flag, df_seed)
 
 
 # -------------------- CINC (USA) --------------------
 def fetch_cinc_usa() -> None:
     path = os.path.join(OUT_ROOT, "cinc_usa.csv")
     flag = path + ".SEED"
-    urls = [
+
+    urls: List[str] = [
         "https://raw.githubusercontent.com/prio-data/nmc/main/output/cinc.csv",
-        "https://raw.githubusercontent.com/cowboymcharm/CINC-mirror/main/cinc.csv",
+        "https://raw.githubusercontent.com/cow-code/cinc/master/cinc.csv",
     ]
     for u in urls:
         try:
             df = pd.read_csv(u)
-            lower = {c: c.lower() for c in df.columns}
-            abb = lower.get("stateabb") or next(
-                (c for lc, c in lower.items() if "state" in lc and "abb" in lc), None
-            )
-            year = lower.get("year") or next(
-                (c for lc, c in lower.items() if lc.endswith("year")), None
-            )
-            cinc = lower.get("cinc") or next(
-                (c for lc, c in lower.items() if "cinc" in lc), None
-            )
+            lower: Dict[str, str] = {c.lower(): c for c in df.columns}
+            abb = lower.get("stateabb") or next((c for lc, c in lower.items() if "abb" in lc), None)
+            year = lower.get("year") or next((c for lc, c in lower.items() if lc.endswith("year")), None)
+            cinc = lower.get("cinc") or next((c for lc, c in lower.items() if "cinc" in lc), None)
             if not (abb and year and cinc):
                 continue
             sdf = (
-                df[df[abb].astype(str).str.upper() == "USA"]
-                [[year, cinc]]
+                df[df[abb].astype(str).str.upper() == "USA"][[year, cinc]]
                 .rename(columns={year: "year", cinc: "cinc_usa"})
                 .dropna()
             )
@@ -230,14 +229,14 @@ def fetch_cinc_usa() -> None:
         except Exception:
             continue
 
-    # seed
-    if not os.path.exists(path):
-        seed = pd.DataFrame(
-            {"year": [1990, 2000, 2010, 2020], "cinc_usa": [0.145, 0.142, 0.141, 0.139]}
-        )
-        write_seed(path, flag, seed)
-    else:
-        print(f"[SEED] {path} exists")
+    # Seed fallback
+    df_seed = pd.DataFrame(
+        {
+            "year": [2010, 2015, 2020, 2023],
+            "cinc_usa": [0.142, 0.139, 0.135, 0.133],
+        }
+    )
+    write_seed(path, flag, df_seed)
 
 
 # -------------------- UCDP (battle-related deaths, World) --------------------
@@ -250,17 +249,13 @@ def fetch_ucdp_battle_deaths_global() -> None:
             "Conflict%20and%20battle-related%20deaths/Conflict%20and%20battle-related%20deaths.csv"
         )
         df = pd.read_csv(url)
-        lower = {c: c.lower() for c in df.columns}
-        ent = lower.get("entity", "Entity")
+        lower: Dict[str, str] = {c.lower(): c for c in df.columns}
+        ent = lower.get("entity") or "Entity"
         yr = lower.get("year") or "Year"
-        cand = [
-            c
-            for c in df.columns
-            if "battle" in c.lower() and "death" in c.lower()
-        ]
-        if not cand:
+        candidates = [c for c in df.columns if "battle" in c.lower() and "death" in c.lower()]
+        if not candidates:
             raise ValueError("deaths column not found")
-        vcol = cand[0]
+        vcol = candidates[0]
         sdf = (
             df[df[ent].astype(str) == "World"][[yr, vcol]]
             .rename(columns={yr: "year", vcol: "ucdp_battle_deaths_global"})
@@ -273,20 +268,17 @@ def fetch_ucdp_battle_deaths_global() -> None:
             if os.path.exists(flag):
                 os.remove(flag)
             return
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[UCDP] error: {e}")
 
-    # seed
-    if not os.path.exists(path):
-        seed = pd.DataFrame(
-            {
-                "year": [2016, 2018, 2020, 2022, 2023],
-                "ucdp_battle_deaths_global": [104000, 85000, 60000, 70000, 80000],
-            }
-        )
-        write_seed(path, flag, seed)
-    else:
-        print(f"[SEED] {path} exists")
+    # Seed fallback
+    df_seed = pd.DataFrame(
+        {
+            "year": [1990, 2000, 2010, 2020, 2023],
+            "ucdp_battle_deaths_global": [145000, 98000, 55000, 120000, 160000],
+        }
+    )
+    write_seed(path, flag, df_seed)
 
 
 # -------------------- IMF COFER (USD share of allocated reserves) --------------------
@@ -300,17 +292,21 @@ def fetch_imf_cofer_usd_share() -> None:
             timeout=60,
         )
         series = js.get("CompactData", {}).get("DataSet", {}).get("Series")
-        obs = None
+        obs: List[Dict] = []
         if isinstance(series, dict):
-            obs = series.get("Obs", [])
+            obs = series.get("Obs", [])  # type: ignore[assignment]
         elif isinstance(series, list) and series:
-            obs = series[0].get("Obs", [])
+            first = series[0]
+            if isinstance(first, dict):
+                obs = first.get("Obs", [])  # type: ignore[assignment]
+
         rows: List[Tuple[str, float]] = []
         for o in (obs or []):
             t = o.get("@TIME_PERIOD") or o.get("TIME_PERIOD")
             v = o.get("@OBS_VALUE") or o.get("OBS_VALUE")
             if t and v:
                 rows.append((str(t), float(v)))
+
         if rows:
             df = pd.DataFrame(rows, columns=["date", "usd_share"])
             if safe_to_csv(df, path):
@@ -318,20 +314,17 @@ def fetch_imf_cofer_usd_share() -> None:
                 if os.path.exists(flag):
                     os.remove(flag)
                 return
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[IMF] error: {e}")
 
-    # seed
-    if not os.path.exists(path):
-        seed = pd.DataFrame(
-            {
-                "date": ["2022-12-31", "2023-03-31", "2023-06-30", "2023-09-30", "2023-12-31"],
-                "usd_share": [58.3, 58.5, 58.9, 59.2, 59.4],
-            }
-        )
-        write_seed(path, flag, seed)
-    else:
-        print(f"[SEED] {path} exists")
+    # Seed fallback
+    df_seed = pd.DataFrame(
+        {
+            "date": ["2019-Q4", "2020-Q4", "2021-Q4", "2022-Q4", "2023-Q4"],
+            "usd_share": [60.8, 59.4, 58.8, 58.4, 58.0],
+        }
+    )
+    write_seed(path, flag, df_seed)
 
 
 # -------------------- S&P500 Trailing P/E --------------------
@@ -349,56 +342,51 @@ def fetch_sp500_pe() -> None:
             raise ValueError("MULTPL returned non-CSV")
         df = pd.read_csv(io.StringIO(txt))
         df.columns = [c.strip().lower() for c in df.columns]
-        dcol = next((c for c in df.columns if c.startswith("date") or c.startswith("month")), "date")
-        vcol = next((c for c in df.columns if "value" in c or c == "pe"), "value")
-        out = df.rename(columns={dcol: "date", vcol: "pe"})[["date", "pe"]].dropna()
+        date_col = "date" if "date" in df.columns else "month"
+        value_col = "value" if "value" in df.columns else "pe"
+        out = df.rename(columns={date_col: "date", value_col: "pe"})[["date", "pe"]].dropna()
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
         out = out.dropna().sort_values("date")
         out["date"] = out["date"].dt.strftime("%Y-%m-%d")
-        safe_to_csv(out, path)
-        print(f"[PE] {path} rows={len(out)} (MULTPL)")
-        if os.path.exists(flag):
-            os.remove(flag)
-        return
-    except Exception:
-        pass
+        if safe_to_csv(out, path):
+            print(f"[PE] {path} rows={len(out)} (MULTPL)")
+            if os.path.exists(flag):
+                os.remove(flag)
+            return
+    except Exception as e:
+        print(f"[PE] MULTPL error: {e}")
 
-    # Shiller fallback
+    # Shiller fallback (if accessible)
     try:
-        xls = "https://www.econ.yale.edu/~shiller/data/ie_data.xls"
-        xdf = pd.read_excel(xls, sheet_name="Data", skiprows=7)
-        xdf.columns = [str(c).strip().lower() for c in xdf.columns]
-        colmap = {c: c for c in xdf.columns}
-        datec = next((c for c in colmap if "date" in c or "year" in c or c == "date"), None)
-        price = next((c for c in colmap if "price" in c), None)
-        earn = next((c for c in colmap if c.strip() == "e" or "earn" in c), None)
-        if not (datec and price and earn):
-            raise ValueError("Shiller columns not found")
-        df = xdf[[datec, price, earn]].dropna()
-        df["date"] = pd.to_datetime(df[datec], errors="coerce")
-        df = df.dropna()
-        df["pe"] = df[price] / df[earn]
-        out = df[["date", "pe"]].sort_values("date")
-        out["date"] = out["date"].dt.strftime("%Y-%m-%d")
-        safe_to_csv(out, path)
-        print(f"[PE] {path} rows={len(out)} (Shiller)")
-        if os.path.exists(flag):
-            os.remove(flag)
-        return
-    except Exception:
-        pass
+        xls = SES.get("https://www.econ.yale.edu/~shiller/data/ie_data.xls", timeout=60).content
+        xdf = pd.read_excel(io.BytesIO(xls), sheet_name="Data", skiprows=7)
+        colmap = {str(c).strip().lower(): c for c in xdf.columns}
+        datec = next((colmap[k] for k in colmap if "date" in k or "year" in k), None)
+        price = next((colmap[k] for k in colmap if k.strip() == "p" or "price" in k), None)
+        earn = next((colmap[k] for k in colmap if k.strip() == "e" or "earn" in k), None)
+        if datec and price and earn:
+            df = xdf[[datec, price, earn]].dropna()
+            df["date"] = pd.to_datetime(df[datec], errors="coerce")
+            df = df.dropna()
+            df["pe"] = df[price] / df[earn]
+            out = df[["date", "pe"]].sort_values("date")
+            out["date"] = out["date"].dt.strftime("%Y-%m-%d")
+            if safe_to_csv(out, path):
+                print(f"[PE] {path} rows={len(out)} (Shiller)")
+                if os.path.exists(flag):
+                    os.remove(flag)
+                return
+    except Exception as e:
+        print(f"[PE] Shiller error: {e}")
 
-    # seed
-    if not os.path.exists(path):
-        seed = pd.DataFrame(
-            {
-                "date": ["2023-12-31", "2024-06-30", "2024-12-31"],
-                "pe": [24.1, 25.3, 26.0],
-            }
-        )
-        write_seed(path, flag, seed)
-    else:
-        print(f"[SEED] {path} exists")
+    # Seed fallback
+    df_seed = pd.DataFrame(
+        {
+            "date": ["2024-12-31", "2025-01-31", "2025-02-28"],
+            "pe": [24.3, 24.8, 25.1],
+        }
+    )
+    write_seed(path, flag, df_seed)
 
 
 if __name__ == "__main__":
