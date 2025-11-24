@@ -30,11 +30,11 @@ FRED_DIR: str = os.path.join(DATA_DIR, "fred")
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "EconMirror/App"})
 
-# FRED client (reads FRED_API_KEY from Streamlit secrets)
+# FRED client (reads FRED_API_KEY from Streamlit secrets.toml)
 fred = Fred(api_key=st.secrets["FRED_API_KEY"])
 
 # ---------------------------------------------------------------------
-# Indicators / thresholds / units
+# CORE ECON INDICATORS / THRESHOLDS / UNITS
 # ---------------------------------------------------------------------
 INDICATORS: List[str] = [
     "Yield curve",
@@ -89,83 +89,85 @@ INDICATORS: List[str] = [
     "Debt burden",
 ]
 
+# For the core table we just want “rough rule of thumb” thresholds.
+# Only simple > / < rules are parsed into ✅ / ⚠️, everything else gets “—”.
 THRESHOLDS: Dict[str, str] = {
-    "Yield curve": "10Y–2Y > 1% (steepens)",
-    "Consumer confidence": "> 90 index (rising)",
-    "Building permits": "+5% YoY (increasing)",
-    "Unemployment claims": "−10% YoY (falling)",
-    "LEI (Conference Board Leading Economic Index)": "Up 1–2% (positive)",
-    "GDP": "2–4% YoY (rising)",
-    "Capacity utilization": "> 80% (high)",
-    "Inflation": "2–3% (moderate)",
-    "Retail sales": "+3–5% YoY (rising)",
-    "Nonfarm payrolls": "+150K/month (steady)",
-    "Wage growth": "> 3% YoY (rising)",
-    "P/E ratios": "20+ (high)",
-    "Credit growth": "> 5% YoY (increasing)",
-    "Fed funds futures": "Hikes implied +0.5%+",
-    "Short rates": "Rising (tightening)",
-    "Industrial production": "+2–5% YoY (increasing)",
-    "Consumer/investment spending": "Positive growth (high)",
-    "Productivity growth": "> 3% YoY (rising)",
-    "Debt-to-GDP": "< 60% (low)",
-    "Foreign reserves": "+10% YoY (increasing)",
-    "Real rates": "< −1% (falling)",
-    "Trade balance": "Surplus > 2% of GDP (improving)",
-    "Asset prices > traditional metrics": "P/E +20% (high vs. fundamentals)",
-    "New buyers entering (market participation) (FINRA margin debt, FRED proxy)": "+15% (increasing)",
-    "Wealth gaps": "Top 1% share +5% (widening)",
-    "Credit spreads": "> 500 bps (widening)",
-    "Central bank printing (M2)": "+10% YoY (printing)",
-    "Currency devaluation": "−10% to −20% (devaluation)",
-    "Fiscal deficits": "> 6% of GDP (high)",
-    "Debt growth": "+5–10% gap above income growth",
-    "Income growth": "Debt–income growth gap < 5%",
-    "Debt service": "> 20% of incomes (high)",
-    "Education investment": "+5% of budget YoY (surge)",
-    "R&D patents": "+10% YoY (rising)",
-    "Competitiveness index / Competitiveness (WEF)": "+5 ranks (improving)",
-    "GDP per capita growth": "+3% YoY (accelerating)",
-    "Trade share": "+2% of global share (expanding)",
-    "Military spending": "> 4% of GDP (peaking)",
-    "Internal conflicts": "Protests +20% (rising)",
-    "Reserve currency usage dropping (IMF COFER USD share)": "−5% of global share (dropping)",
-    "Military losses (UCDP battle-related deaths — Global)": "Defeats +1/year (increasing)",
-    "Economic output share": "−2% of global share (falling)",
-    "Corruption index": "−10 points (worsening)",
-    "Working population": "−1% YoY (aging)",
-    "Education (PISA scores — Math mean, OECD)": "> 500 (top)",
-    "Innovation": "Patents > 20% of global (high)",
-    "GDP share": "+2% of global share (growing)",
-    "Trade dominance": "> 15% of global trade (dominance)",
-    "Power index (CINC — USA)": "Composite 8–10/10 (max)",
-    "Debt burden": "> 100% of GDP (high)",
+    "Yield curve": "> 1",  # 10Y - 2Y in percentage points
+    "Consumer confidence": "> 90",
+    "Building permits": "> 5",
+    "Unemployment claims": "< 300",
+    "LEI (Conference Board Leading Economic Index)": "> 0",
+    "GDP": "> 2",
+    "Capacity utilization": "> 80",
+    "Inflation": "2 <= x <= 3",
+    "Retail sales": "> 3",
+    "Nonfarm payrolls": "> 150",
+    "Wage growth": "> 3",
+    "P/E ratios": "> 20",
+    "Credit growth": "> 5",
+    "Fed funds futures": "> 50",
+    "Short rates": "> 0",
+    "Industrial production": "> 2",
+    "Consumer/investment spending": "> 0",
+    "Productivity growth": "> 3",
+    "Debt-to-GDP": "< 60",
+    "Foreign reserves": "> 0",
+    "Real rates": "< -1",
+    "Trade balance": "> 0",
+    "Asset prices > traditional metrics": "> 1.2",
+    "New buyers entering (market participation) (FINRA margin debt, FRED proxy)": "> 15",
+    "Wealth gaps": "widening",
+    "Credit spreads": "> 500",
+    "Central bank printing (M2)": "> 10",
+    "Currency devaluation": "< -10",
+    "Fiscal deficits": "> 6",
+    "Debt growth": "> 5",
+    "Income growth": "> 0",
+    "Debt service": "> 20",
+    "Education investment": "> 5",
+    "R&D patents": "> 0",
+    "Competitiveness index / Competitiveness (WEF)": "improving",
+    "GDP per capita growth": "> 3",
+    "Trade share": "> 2",
+    "Military spending": "> 4",
+    "Internal conflicts": "rising",
+    "Reserve currency usage dropping (IMF COFER USD share)": "falling",
+    "Military losses (UCDP battle-related deaths — Global)": "rising",
+    "Economic output share": "falling",
+    "Corruption index": "worsening",
+    "Working population": "falling",
+    "Education (PISA scores — Math mean, OECD)": "> 500",
+    "Innovation": "rising",
+    "GDP share": "rising",
+    "Trade dominance": "> 15",
+    "Power index (CINC — USA)": "high",
+    "Debt burden": "> 100",
 }
 
 UNITS: Dict[str, str] = {
-    "Yield curve": "%",
-    "Consumer confidence": "Index",
-    "Building permits": "Thousands",
-    "Unemployment claims": "Thousands",
-    "LEI (Conference Board Leading Economic Index)": "Index",
+    "Yield curve": "pct pts (10Y–2Y)",
+    "Consumer confidence": "index",
+    "Building permits": "thousands",
+    "Unemployment claims": "thousands",
+    "LEI (Conference Board Leading Economic Index)": "index",
     "GDP": "YoY %",
     "Capacity utilization": "%",
     "Inflation": "YoY %",
     "Retail sales": "YoY %",
-    "Nonfarm payrolls": "Thousands",
+    "Nonfarm payrolls": "thousands",
     "Wage growth": "YoY %",
-    "P/E ratios": "Ratio",
+    "P/E ratios": "ratio",
     "Credit growth": "YoY %",
     "Fed funds futures": "bps",
     "Short rates": "%",
     "Industrial production": "YoY %",
     "Consumer/investment spending": "YoY %",
     "Productivity growth": "YoY %",
-    "Debt-to-GDP": "%",
+    "Debt-to-GDP": "% of GDP",
     "Foreign reserves": "YoY %",
     "Real rates": "%",
     "Trade balance": "USD bn",
-    "Asset prices > traditional metrics": "Ratio",
+    "Asset prices > traditional metrics": "ratio",
     "New buyers entering (market participation) (FINRA margin debt, FRED proxy)": "YoY %",
     "Wealth gaps": "Gini / share",
     "Credit spreads": "bps",
@@ -176,27 +178,27 @@ UNITS: Dict[str, str] = {
     "Income growth": "YoY %",
     "Debt service": "% of income",
     "Education investment": "% of GDP",
-    "R&D patents": "Count",
-    "Competitiveness index / Competitiveness (WEF)": "Rank/Index",
+    "R&D patents": "count",
+    "Competitiveness index / Competitiveness (WEF)": "rank / index",
     "GDP per capita growth": "YoY %",
     "Trade share": "% of global",
     "Military spending": "% of GDP",
-    "Internal conflicts": "Index",
+    "Internal conflicts": "index",
     "Reserve currency usage dropping (IMF COFER USD share)": "% of allocated",
-    "Military losses (UCDP battle-related deaths — Global)": "Deaths",
+    "Military losses (UCDP battle-related deaths — Global)": "deaths",
     "Economic output share": "% of global",
-    "Corruption index": "Index",
+    "Corruption index": "index",
     "Working population": "% of pop (15–64)",
-    "Education (PISA scores — Math mean, OECD)": "Score",
-    "Innovation": "Index / share",
+    "Education (PISA scores — Math mean, OECD)": "score",
+    "Innovation": "index / share",
     "GDP share": "% of global",
     "Trade dominance": "% of global",
-    "Power index (CINC — USA)": "Index",
+    "Power index (CINC — USA)": "index",
     "Debt burden": "% of GDP",
 }
 
 # ---------------------------------------------------------------------
-# Mappings for programmatic fetch
+# MAPPINGS FOR PROGRAMMATIC FETCH (CORE TAB)
 # ---------------------------------------------------------------------
 FRED_MAP: Dict[str, str] = {
     "Yield curve": "T10Y2Y",
@@ -247,7 +249,7 @@ WB_SHARE_CODES: Dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------
-# Helpers
+# HELPERS (CORE FETCH + MIRRORS)
 # ---------------------------------------------------------------------
 def to_float(x: object) -> float:
     if x is None:
@@ -357,11 +359,7 @@ def fred_history(series_id: str, mode: str = "level", n: int = 24) -> List[float
             vals.append((val / base - 1.0) * 100.0)
         vals = [v for v in vals if v is not None]
         return vals[-n:]
-    return (
-        pd.to_numeric(s.tail(n).values, errors="coerce")
-        .astype(float)
-        .tolist()
-    )
+    return pd.to_numeric(s.tail(n).values, errors="coerce").astype(float).tolist()
 
 
 def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]]:
@@ -391,12 +389,7 @@ def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]
         t = t.sort_index()
         cur = to_float(t.iloc[-1]["val"])
         prev = to_float(t.iloc[-2]["val"]) if len(t) > 1 else float("nan")
-        hist = (
-            pd.to_numeric(t["val"], errors="coerce")
-            .tail(24)
-            .astype(float)
-            .tolist()
-        )
+        hist = pd.to_numeric(t["val"], errors="coerce").tail(24).astype(float).tolist()
     except Exception:
         return float("nan"), float("nan"), "—", []
     return cur, prev, "WB (online)", hist
@@ -430,7 +423,7 @@ def wb_share_series(code: str) -> Tuple[pd.DataFrame, str]:
         df2 = us_online.join(w_online, how="inner").dropna()
         df2["share"] = (
             pd.to_numeric(df2["us"], errors="coerce")
-            / pd.to_numeric(df2["w"], errors="coerce")
+            / pd.to_numeric(df2["w"], errors="coctrine")
             * 100.0
         )
         df2 = df2.reset_index().rename(columns={"index": "date"})
@@ -456,12 +449,7 @@ def mirror_latest_csv(
     cur = to_float(df.iloc[-1][value_col])
     prev = to_float(df.iloc[-2][value_col]) if len(df) > 1 else float("nan")
     src = "Pinned seed" if is_seed(path) else "Mirror"
-    hist = (
-        pd.to_numeric(df[value_col], errors="coerce")
-        .tail(24)
-        .astype(float)
-        .tolist()
-    )
+    hist = pd.to_numeric(df[value_col], errors="coerce").tail(24).astype(float).tolist()
     return cur, prev, src, hist
 
 
@@ -476,7 +464,7 @@ def sp500_pe_latest() -> Tuple[float, float, str, List[float]]:
 
 
 # ---------------------------------------------------------------------
-# Threshold helpers
+# SIMPLE THRESHOLD PARSER (ONLY FOR CORE TAB)
 # ---------------------------------------------------------------------
 def parse_simple_threshold(txt: object) -> Tuple[Optional[str], Optional[float]]:
     if not isinstance(txt, str):
@@ -498,389 +486,353 @@ def evaluate_signal(current: float, threshold_text: str) -> Tuple[str, str]:
 
 
 # ---------------------------------------------------------------------
-# Static long-term & short-term cycle dashboards
-# (snapshot values, roughly as of late 2025)
+# LONG-TERM AND SHORT-TERM DASHBOARD DATA (STATIC NARRATIVE)
 # ---------------------------------------------------------------------
-def build_long_term_df() -> pd.DataFrame:
-    rows: List[Dict[str, str]] = [
-        {
-            "Signal": "Total Debt/GDP (Private + Public + Foreign)",
-            "Current value": "≈ 355%",
-            "Red-flag threshold": "> 300–400%",
-            "Status": "🔴 Red",
-            "Direction": "Still rising (~+2% YoY)",
-            "Why this matters in the long-term debt cycle": (
-                "When total claims on the economy exceed output by ~3–4x, "
-                "systems hit debt saturation. Historic peaks (1929 US, "
-                "Japan 1980s) preceded long deleveraging or restructuring."
-            ),
-        },
-        {
-            "Signal": "Productivity growth (real, US)",
-            "Current value": "≈ 3.3% Q2 2025, but weak trend since 2008",
-            "Red-flag threshold": "< 1.5% for > 10 years",
-            "Status": "🟡 Watch",
-            "Direction": "Volatile; long-run trend stagnant",
-            "Why this matters in the long-term debt cycle": (
-                "Productivity is the engine to service debt. Stagnant productivity "
-                "with rising debt usually leads to money printing and currency "
-                "debasement instead of real growth."
-            ),
-        },
-        {
-            "Signal": "Gold price (real, inflation-adjusted)",
-            "Current value": "≈ $4,062/oz real (nominal ~$4,065)",
-            "Red-flag threshold": "> 2× long-run real average (~$1,400)",
-            "Status": "🔴 Red",
-            "Direction": "Up strongly vs recent years",
-            "Why this matters in the long-term debt cycle": (
-                "Gold is the classic hedge against fiat and sovereign-debt stress. "
-                "Sustained real breakouts in gold have aligned with major "
-                "re-pricings of monetary regimes."
-            ),
-        },
-        {
-            "Signal": "Wage share of GDP (labor share proxy)",
-            "Current value": "Low vs 1970s; stagnant",
-            "Red-flag threshold": "Multi-decade downtrend; structurally low level",
-            "Status": "🟡 Watch",
-            "Direction": "Flat/low historically",
-            "Why this matters in the long-term debt cycle": (
-                "Falling wage share pushes households toward borrowing to maintain "
-                "consumption, inflating the long debt cycle and feeding political "
-                "tension and instability."
-            ),
-        },
-        {
-            "Signal": "Real 30-year Treasury yield",
-            "Current value": "≈ 1.8% (4.7% nominal – ~2.9% CPI)",
-            "Red-flag threshold": "Prolonged < 2% (or negative)",
-            "Status": "🟡 Watch",
-            "Direction": "Low, slightly rising",
-            "Why this matters in the long-term debt cycle": (
-                "Persistently low or negative long real yields signal financial "
-                "repression and fiscal dominance — typical in late-cycle regimes "
-                "struggling with high debt stocks."
-            ),
-        },
-        {
-            "Signal": "USD vs gold power (gold per $1,000)",
-            "Current value": "≈ 0.24 oz per $1,000",
-            "Red-flag threshold": "Breaking below long-term uptrend",
-            "Status": "🔴 Red",
-            "Direction": "Gold outperforming USD",
-            "Why this matters in the long-term debt cycle": (
-                "Weaker USD vs gold reflects erosion in monetary credibility. "
-                "Patterns like this appeared in prior reserve-currency transitions "
-                "and during Bretton Woods breakdown."
-            ),
-        },
-        {
-            "Signal": "Geopolitical Risk Index (global)",
-            "Current value": "Elevated vs historical average",
-            "Red-flag threshold": "> 150 and rising with high debt",
-            "Status": "🟡 Watch",
-            "Direction": "Trending higher",
-            "Why this matters in the long-term debt cycle": (
-                "High debt combined with rising geopolitical risk increases the "
-                "chance of conflict-driven resets, restructuring, or order changes."
-            ),
-        },
-        {
-            "Signal": "Income inequality (US Gini coefficient)",
-            "Current value": "≈ 0.41 (near modern highs)",
-            "Red-flag threshold": "> 0.40 and rising",
-            "Status": "🔴 Red",
-            "Direction": "Higher than 1980s–1990s",
-            "Why this matters in the long-term debt cycle": (
-                "High inequality plus heavy debt loads is a classic setup for "
-                "populism, policy shocks, and regime change — seen in the 1930s, "
-                "1970s, and other major turning points."
-            ),
-        },
-    ]
-    return pd.DataFrame(rows)
+LONG_TERM_ROWS: List[Dict[str, str]] = [
+    {
+        "Signal": "Total Debt/GDP (Private + Public + Foreign)",
+        "Current value": "≈ 355% (BIS total credit to non-financial sector, latest available 2025)",
+        "Red-flag threshold": "> 300–400% and still rising",
+        "Status": "Red",
+        "Direction": "Still rising (~+2% YoY)",
+        "Why this matters in the long-term debt cycle": (
+            "When total claims on the economy exceed output 3–4x, the system relies on defaults, "
+            "inflation, or currency debasement to reset. Every historical long-term debt cycle "
+            "(1930s US, 1980s Japan) peaked at similar levels."
+        ),
+    },
+    {
+        "Signal": "Productivity growth (real, US)",
+        "Current value": "≈ 3.3% YoY in Q2 2025, but weak average since 2008",
+        "Red-flag threshold": "< 1.5% for > 10 years",
+        "Status": "Watch",
+        "Direction": "Volatile; long-run trend stagnant",
+        "Why this matters in the long-term debt cycle": (
+            "Productivity is what services debt over decades. If productivity stagnates while debt "
+            "keeps rising, the only way to keep the game going is more leverage and financial "
+            "engineering – classic late-stage behaviour."
+        ),
+    },
+    {
+        "Signal": "Gold price (real, inflation-adjusted)",
+        "Current value": "≈ $4,062/oz real (nominal ≈ $4,065; GuruFocus inflation-adjusted series)",
+        "Red-flag threshold": "> 2x long-run real average (~$1,400)",
+        "Status": "Red",
+        "Direction": "Up strongly vs recent years",
+        "Why this matters in the long-term debt cycle": (
+            "Gold is the classic hedge against fiat and sovereign-debt risk. Sharp, sustained rises "
+            "in real gold prices usually signal that investors are front-running currency debasement "
+            "and a potential reset of the monetary order."
+        ),
+    },
+    {
+        "Signal": "Wage share of GDP (labor share proxy)",
+        "Current value": "Low vs 1970s; stagnant around post-2000 lows",
+        "Red-flag threshold": "Multi-decade downtrend; structurally low level",
+        "Status": "Watch",
+        "Direction": "Flat / low historically",
+        "Why this matters in the long-term debt cycle": (
+            "Falling wage share pushes households toward borrowing simply to maintain living "
+            "standards. Combining high private debt with weak real incomes has preceded social "
+            "stress and policy regime shifts in past cycles."
+        ),
+    },
+    {
+        "Signal": "Real 30-year US Treasury yield",
+        "Current value": "≈ 1.8% real (≈4.7% nominal minus ≈2.9% CPI)",
+        "Red-flag threshold": "Prolonged < 2% or deeply negative for years",
+        "Status": "Watch",
+        "Direction": "Low, slightly rising",
+        "Why this matters in the long-term debt cycle": (
+            "Persistently low or negative long real yields signal financial repression – using "
+            "inflation to erode the real value of debt. That is a standard tool used in the "
+            "endgame of long-term debt cycles."
+        ),
+    },
+    {
+        "Signal": "USD vs gold power (gold per $1,000)",
+        "Current value": "≈ 0.24 oz per $1,000 at current prices",
+        "Red-flag threshold": "Breaking below long-term uptrend, toward 0.10 oz per $1,000",
+        "Status": "Red",
+        "Direction": "Gold outperforming USD",
+        "Why this matters in the long-term debt cycle": (
+            "When a given amount of dollars buys less and less gold over time, it is a sign that "
+            "confidence in the currency’s long-term value is eroding. That pattern has appeared "
+            "around prior reserve-currency peaks."
+        ),
+    },
+    {
+        "Signal": "Geopolitical Risk Index (global, GPR)",
+        "Current value": "Elevated vs historical average (~180 on recent readings)",
+        "Red-flag threshold": "> 150 and rising with high debt",
+        "Status": "Watch",
+        "Direction": "Trending higher",
+        "Why this matters in the long-term debt cycle": (
+            "High debt combined with rising geopolitical tension is the environment in which resets "
+            "and realignments tend to happen. Wars and major conflicts have repeatedly been used "
+            "to liquidate unsustainable debt loads."
+        ),
+    },
+    {
+        "Signal": "Income inequality (US Gini coefficient)",
+        "Current value": "≈ 0.41 (near modern highs)",
+        "Red-flag threshold": "> 0.40 and rising",
+        "Status": "Red",
+        "Direction": "Higher than 1980s–1990s",
+        "Why this matters in the long-term debt cycle": (
+            "High inequality plus heavy debt loads is a classic recipe for internal conflict. "
+            "Very unequal societies with large debt overhangs often end up in either forced "
+            "restructurings or more chaotic resets."
+        ),
+    },
+]
 
-
-def build_short_term_df() -> pd.DataFrame:
-    rows: List[Dict[str, str]] = [
-        {
-            "Indicator": "Margin debt as % of GDP",
-            "Current value": "≈ 3.3–3.5%",
-            "Red-flag threshold": "> 2.5%",
-            "Status": "🔴 Red",
-            "Direction": "Elevated vs long-run norms",
-            "Why this matters in the short-term cycle": (
-                "Margin debt is leveraged speculation. Peaks in 1929, 2000, 2007, "
-                "and 2021–22 coincided with major tops. When it rolls over, forced "
-                "selling amplifies downturns."
-            ),
-        },
-        {
-            "Indicator": "Real short rate (Fed funds – CPI)",
-            "Current value": "≈ +1.0–1.5%",
-            "Red-flag threshold": "Bubble build-up: < 0% for > 12 months",
-            "Status": "🟢 Green",
-            "Direction": "Positive vs 2020–21 negatives",
-            "Why this matters in the short-term cycle": (
-                "Deep negative real rates make borrowing essentially free, fueling "
-                "asset bubbles. The flip back to positive removes that fuel."
-            ),
-        },
-        {
-            "Indicator": "CBOE total put/call ratio",
-            "Current value": "≈ 0.7–0.75",
-            "Red-flag threshold": "< 0.70 (extreme complacency)",
-            "Status": "🟡 Watch",
-            "Direction": "Near complacent levels",
-            "Why this matters in the short-term cycle": (
-                "Very low put/call readings mean almost nobody is hedging. "
-                "Readings under ~0.7 have often aligned with late-stage "
-                "melt-ups and subsequent corrections."
-            ),
-        },
-        {
-            "Indicator": "AAII bullish sentiment %",
-            "Current value": "Low–moderate bulls (~30–35%)",
-            "Red-flag threshold": "> 60% for multiple weeks",
-            "Status": "🟢 Green",
-            "Direction": "Not euphoric",
-            "Why this matters in the short-term cycle": (
-                "When > 60% of retail survey respondents are bullish for weeks, "
-                "there are few incremental buyers left. Historically this has "
-                "marked exhaustion zones."
-            ),
-        },
-        {
-            "Indicator": "S&P 500 trailing P/E",
-            "Current value": "≈ 29–30×",
-            "Red-flag threshold": "> 30× sustained",
-            "Status": "🟡 Watch",
-            "Direction": "At the high end of history",
-            "Why this matters in the short-term cycle": (
-                "Only a few eras sustained P/E > 30 (late 1920s, late 1990s, "
-                "2020–21). Each was followed by significant drawdowns as valuation "
-                "mean reversion kicked in."
-            ),
-        },
-        {
-            "Indicator": "Fed policy stance (QE vs QT)",
-            "Current value": "QT / modest balance-sheet shrink",
-            "Red-flag threshold": "Turn from QE to QT / rapid hikes",
-            "Status": "🟢 Green (for now)",
-            "Direction": "Liquidity slowly draining",
-            "Why this matters in the short-term cycle": (
-                "Every big bubble ended when central banks removed liquidity "
-                "or hiked aggressively: 1929, 2000, 2007, 2022. Liquidity is the "
-                "core driver of risk appetite."
-            ),
-        },
-        {
-            "Indicator": "High-yield credit spreads",
-            "Current value": "≈ 300–320 bps",
-            "Red-flag threshold": "> 400 bps and widening",
-            "Status": "🟢 Green",
-            "Direction": "Still tight",
-            "Why this matters in the short-term cycle": (
-                "Credit markets often flash warning before equities. Spread "
-                "widening signals rising default risk and tightening conditions."
-            ),
-        },
-        {
-            "Indicator": "Insider selling vs buybacks",
-            "Current value": "Heavy insider selling; buybacks softer",
-            "Red-flag threshold": "Rising insider sales + slowing buybacks",
-            "Status": "🔴 Red",
-            "Direction": "Insiders de-risking into strength",
-            "Why this matters in the short-term cycle": (
-                "Executives see fundamentals first. When they sell heavily while "
-                "corporate buybacks slow, it has preceded multiple major tops."
-            ),
-        },
-    ]
-    return pd.DataFrame(rows)
-
+SHORT_TERM_ROWS: List[Dict[str, str]] = [
+    {
+        "Indicator": "Margin debt as % of GDP",
+        "Current value": "≈ 3.3–3.5% (FINRA margin debt ÷ US nominal GDP)",
+        "Red-flag threshold": "≥ 2.5% and especially ≥ 3.5%",
+        "Status": "Red",
+        "Direction": "Elevated vs long-run norms",
+        "Why this matters in the short-term cycle": (
+            "Margin debt is leveraged speculation. Peaks in 1929, 2000, 2007, and 2022 all had "
+            "very high margin debt just before markets reversed, because forced deleveraging turns "
+            "small dips into crashes."
+        ),
+    },
+    {
+        "Indicator": "Real short rate (Fed funds minus CPI)",
+        "Current value": "≈ +1.0–1.5% (policy rate minus trailing CPI inflation)",
+        "Red-flag threshold": (
+            "Bubble build-up when < 0% for > 12 months; bubble popping risk when rises fast to "
+            "≥ +1.5% and keeps climbing"
+        ),
+        "Status": "Green",
+        "Direction": "Positive vs 2020–21 negatives",
+        "Why this matters in the short-term cycle": (
+            "Deeply negative real rates make borrowing essentially free, encouraging leverage and "
+            "asset bubbles. When real rates swing positive and keep rising, the cheap fuel "
+            "disappears and exposes weak balance sheets."
+        ),
+    },
+    {
+        "Indicator": "CBOE total put/call ratio",
+        "Current value": "≈ 0.70–0.75 (calls slightly outnumber puts)",
+        "Red-flag threshold": "< 0.70 for multiple days (extreme complacency)",
+        "Status": "Watch",
+        "Direction": "Near complacent levels",
+        "Why this matters in the short-term cycle": (
+            "Very low put/call readings mean almost nobody is buying downside protection. "
+            "Historically, that kind of one-sided positioning has appeared just before major tops."
+        ),
+    },
+    {
+        "Indicator": "AAII bullish sentiment %",
+        "Current value": "Low–moderate bulls (~30–35% in recent AAII surveys)",
+        "Red-flag threshold": "> 60% for 2+ weeks",
+        "Status": "Green",
+        "Direction": "Not euphoric",
+        "Why this matters in the short-term cycle": (
+            "When more than 60% of survey respondents are bullish for several weeks, it usually "
+            "means most retail investors are already in – exactly what has lined up with prior "
+            "peaks in 1987, 2000, 2007, and 2022."
+        ),
+    },
+    {
+        "Indicator": "S&P 500 trailing P/E",
+        "Current value": "≈ 29–30x (price ÷ trailing 12-month earnings)",
+        "Red-flag threshold": "> 30x sustained while other risk lights are flashing",
+        "Status": "Watch",
+        "Direction": "At the high end of history",
+        "Why this matters in the short-term cycle": (
+            "Only a few eras have kept P/E above 30 for long – late 1920s, late 1990s, and "
+            "2021–22. Each time, high valuations plus tighter policy led to big drawdowns."
+        ),
+    },
+    {
+        "Indicator": "Fed policy stance (QE vs QT)",
+        "Current value": (
+            "QT: balance sheet shrinking modestly (roughly tens of billions of dollars per month "
+            "based on the Fed H.4.1 report – this describes direction, not a single numeric point)"
+        ),
+        "Red-flag threshold": "Turn from big QE to aggressive QT and/or rapid hikes",
+        "Status": "Green (for now)",
+        "Direction": "Liquidity slowly draining",
+        "Why this matters in the short-term cycle": (
+            "Every big bubble has ended when central banks removed liquidity – by stopping QE, "
+            "raising rates aggressively, or both. The stance of policy tells you whether the tide "
+            "is coming in or going out."
+        ),
+    },
+    {
+        "Indicator": "High-yield credit spreads",
+        "Current value": "≈ 300–320 bps over Treasuries (Bank of America HY index ballpark)",
+        "Red-flag threshold": "> 400 bps and widening quickly",
+        "Status": "Green",
+        "Direction": "Still tight",
+        "Why this matters in the short-term cycle": (
+            "Credit markets often flash warning before equities. When spreads are tight, investors "
+            "are relaxed about default risk. A sharp widening usually marks the shift to risk-off."
+        ),
+    },
+    {
+        "Indicator": "Insider selling vs buybacks",
+        "Current value": "Heavy insider sales; corporate buybacks softer vs peak levels",
+        "Red-flag threshold": "Insider buying ratio < 10% (90%+ selling) plus slowing buybacks",
+        "Status": "Red",
+        "Direction": "Insiders de-risking their own exposure",
+        "Why this matters in the short-term cycle": (
+            "Executives see the business fundamentals first. When they sell heavily while "
+            "companies also reduce buybacks, it is a strong sign insiders don’t believe current "
+            "prices are sustainable."
+        ),
+    },
+]
 
 # ---------------------------------------------------------------------
-# UI
+# UI LAYOUT – TABS
 # ---------------------------------------------------------------------
-st.title("Econ Mirror Dashboard")
-st.caption(
-    "Core macro indicators plus long-term debt cycle and short-term bubble dashboards. "
-    "Data pulled from FRED, World Bank mirrors, and pinned CSVs (PISA, CINC, UCDP, IMF COFER, S&P 500 P/E)."
-)
-
-rows: List[Dict[str, object]] = []
-
-for ind in INDICATORS:
-    unit = UNITS.get(ind, "")
-    cur: float = float("nan")
-    prev: float = float("nan")
-    src: str = "—"
-    hist: List[float] = []
-
-    # World Bank direct indicators
-    if ind in WB_US:
-        c, p, s, h = wb_last_two(WB_US[ind], "USA")
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, s, h
-
-    # Shares (USA vs World)
-    if ind == "GDP share" and pd.isna(cur):
-        series, ssrc = wb_share_series("NY.GDP.MKTP.CD")
-        if not series.empty:
-            cur = to_float(series.iloc[-1]["share"])
-            prev = (
-                to_float(series.iloc[-2]["share"])
-                if len(series) > 1
-                else float("nan")
-            )
-            unit = "% of world"
-            src = ssrc
-            hist = (
-                pd.to_numeric(series["share"], errors="coerce")
-                .tail(24)
-                .astype(float)
-                .tolist()
-            )
-
-    if ind == "Trade dominance" and pd.isna(cur):
-        series, ssrc = wb_share_series("NE.EXP.GNFS.CD")
-        if not series.empty:
-            cur = to_float(series.iloc[-1]["share"])
-            prev = (
-                to_float(series.iloc[-2]["share"])
-                if len(series) > 1
-                else float("nan")
-            )
-            unit = "% of world exports"
-            src = ssrc
-            hist = (
-                pd.to_numeric(series["share"], errors="coerce")
-                .tail(24)
-                .astype(float)
-                .tolist()
-            )
-
-    # Special mirrors / proxies
-    if ind.startswith("Education (PISA scores"):
-        path_pisa = os.path.join(DATA_DIR, "pisa_math_usa.csv")
-        c, p, s, h = mirror_latest_csv(
-            path_pisa,
-            "pisa_math_mean_usa",
-            "year",
-            numeric_time=True,
-        )
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, "OECD PISA — " + s, h
-
-    if ind.startswith("Power index (CINC"):
-        path_cinc = os.path.join(DATA_DIR, "cinc_usa.csv")
-        c, p, s, h = mirror_latest_csv(
-            path_cinc,
-            "cinc_usa",
-            "year",
-            numeric_time=True,
-        )
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, "CINC — " + s, h
-
-    if ind.startswith("Military losses (UCDP"):
-        path_ucdp = os.path.join(DATA_DIR, "ucdp_battle_deaths_global.csv")
-        c, p, s, h = mirror_latest_csv(
-            path_ucdp,
-            "ucdp_battle_deaths_global",
-            "year",
-            numeric_time=True,
-        )
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, "UCDP — " + s, h
-
-    if ind.startswith("Reserve currency usage"):
-        c, p, s, h = cofer_usd_share_latest()
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, s, h
-
-    if ind == "P/E ratios":
-        c, p, s, h = sp500_pe_latest()
-        if not pd.isna(c):
-            cur, prev, src, hist = c, p, s, h
-
-    # FRED-backed indicators
-    if ind in FRED_MAP and pd.isna(cur):
-        series_id = FRED_MAP[ind]
-        mode = "level"
-        if ind in {
-            "Inflation",
-            "Retail sales",
-            "Credit growth",
-            "Industrial production",
-            "Consumer/investment spending",
-            "Central bank printing (M2)",
-            "Debt growth",
-        }:
-            mode = "yoy"
-        c_val, p_val = fred_last_two(series_id, mode=mode)
-        if not pd.isna(c_val):
-            cur, prev = c_val, p_val
-            src = "FRED (mirror/online)"
-            hist = fred_history(series_id, mode=mode, n=24)
-
-    # Build table row
-    threshold_txt = THRESHOLDS.get(ind, "—")
-    signal_icon, signal_cls = evaluate_signal(cur, threshold_txt)
-    seed_badge = " <span class='badge seed'>Pinned seed</span>" if "Pinned seed" in src else ""
-    rows.append(
-        {
-            "Indicator": ind,
-            "Threshold": threshold_txt,
-            "Current": cur,
-            "Previous": prev,
-            "Unit": unit,
-            "Signal": signal_icon,
-            "Source": f"{src}{seed_badge}",
-        }
-    )
-
-# Final main table
-df_out = pd.DataFrame(rows)
-
-# Styling
-st.markdown(
-    """
-    <style>
-        .ok { color: #2ecc71; font-weight: 600; }
-        .warn { color: #e67e22; font-weight: 600; }
-        .badge.seed {
-            background: #8e44ad;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 6px;
-            font-size: 11px;
-            margin-left: 6px;
-        }
-        .stDataFrame { font-size: 14px; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Tabs: core indicators + two cycle dashboards
-tab_main, tab_long, tab_short = st.tabs(
+tab_core, tab_long, tab_short = st.tabs(
     [
         "📊 Core Econ Mirror indicators",
-        "🧭 Long-term debt super-cycle (40–70 yrs)",
-        "📈 Short-term bubble cycle (5–10 yrs)",
+        "📉 Long-term debt super-cycle (40–70 yrs)",
+        "⚡ Short-term bubble cycle (5–10 yrs)",
     ]
 )
 
-with tab_main:
-    st.subheader("Core Macro & System Indicators")
+# ====================== CORE TAB ======================
+with tab_core:
+    st.title("Core Econ Mirror indicators")
+    st.caption(
+        "High-frequency macro indicators pulled from FRED, World Bank mirrors, and pinned CSVs "
+        "for PISA, CINC, UCDP, IMF COFER, and S&P 500 P/E. These update automatically via your "
+        "GitHub Actions mirror job plus live FRED/WB API lookups."
+    )
+
+    rows: List[Dict[str, object]] = []
+
+    for ind in INDICATORS:
+        unit = UNITS.get(ind, "")
+        cur: float = float("nan")
+        prev: float = float("nan")
+        src: str = "—"
+
+        # World Bank direct indicators
+        if ind in WB_US:
+            c, p, s, _ = wb_last_two(WB_US[ind], "USA")
+            if not pd.isna(c):
+                cur, prev, src = c, p, s
+
+        # Shares (USA vs World)
+        if ind == "GDP share" and pd.isna(cur):
+            series, ssrc = wb_share_series("NY.GDP.MKTP.CD")
+            if not series.empty:
+                cur = to_float(series.iloc[-1]["share"])
+                prev = to_float(series.iloc[-2]["share"]) if len(series) > 1 else float("nan")
+                unit = "% of world"
+                src = ssrc
+
+        if ind == "Trade dominance" and pd.isna(cur):
+            series, ssrc = wb_share_series("NE.EXP.GNFS.CD")
+            if not series.empty:
+                cur = to_float(series.iloc[-1]["share"])
+                prev = to_float(series.iloc[-2]["share"]) if len(series) > 1 else float("nan")
+                unit = "% of world exports"
+                src = ssrc
+
+        # Special mirrors / proxies
+        if ind.startswith("Education (PISA scores"):
+            path_pisa = os.path.join(DATA_DIR, "pisa_math_usa.csv")
+            c, p, s, _ = mirror_latest_csv(path_pisa, "pisa_math_mean_usa", "year", numeric_time=True)
+            if not pd.isna(c):
+                cur, prev, src = c, p, "OECD PISA — " + s
+
+        if ind.startswith("Power index (CINC"):
+            path_cinc = os.path.join(DATA_DIR, "cinc_usa.csv")
+            c, p, s, _ = mirror_latest_csv(path_cinc, "cinc_usa", "year", numeric_time=True)
+            if not pd.isna(c):
+                cur, prev, src = c, p, "CINC — " + s
+
+        if ind.startswith("Military losses (UCDP"):
+            path_ucdp = os.path.join(DATA_DIR, "ucdp_battle_deaths_global.csv")
+            c, p, s, _ = mirror_latest_csv(
+                path_ucdp, "ucdp_battle_deaths_global", "year", numeric_time=True
+            )
+            if not pd.isna(c):
+                cur, prev, src = c, p, "UCDP — " + s
+
+        if ind.startswith("Reserve currency usage"):
+            c, p, s, _ = cofer_usd_share_latest()
+            if not pd.isna(c):
+                cur, prev, src = c, p, s
+
+        if ind == "P/E ratios":
+            c, p, s, _ = sp500_pe_latest()
+            if not pd.isna(c):
+                cur, prev, src = c, p, s
+
+        # FRED-backed indicators
+        if ind in FRED_MAP and pd.isna(cur):
+            series_id = FRED_MAP[ind]
+            mode = "level"
+            if ind in {
+                "Inflation",
+                "Retail sales",
+                "Credit growth",
+                "Industrial production",
+                "Consumer/investment spending",
+                "Central bank printing (M2)",
+                "Debt growth",
+            }:
+                mode = "yoy"
+            c_val, p_val = fred_last_two(series_id, mode=mode)
+            if not pd.isna(c_val):
+                cur, prev = c_val, p_val
+                src = "FRED (mirror/online)"
+
+        threshold_txt = THRESHOLDS.get(ind, "—")
+        signal_icon, _ = evaluate_signal(cur, threshold_txt)
+        seed_badge = " <span class='badge seed'>Pinned seed</span>" if "Pinned seed" in src else ""
+
+        rows.append(
+            {
+                "Indicator": ind,
+                "Threshold (rough rule of thumb)": threshold_txt,
+                "Current": cur,
+                "Previous": prev,
+                "Unit": unit,
+                "Signal": signal_icon,
+                "Source": f"{src}{seed_badge}",
+            }
+        )
+
+    df_out = pd.DataFrame(rows)
+
+    st.markdown(
+        """
+        <style>
+            .badge.seed {
+                background: #8e44ad;
+                color: #fff;
+                padding: 2px 6px;
+                border-radius: 6px;
+                font-size: 11px;
+                margin-left: 6px;
+            }
+            /* allow wrapping inside dataframe cells so you see full text */
+            .stDataFrame [data-testid="cell-container"] {
+                white-space: normal !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.dataframe(
         df_out[
             [
                 "Indicator",
-                "Threshold",
+                "Threshold (rough rule of thumb)",
                 "Current",
                 "Previous",
                 "Unit",
@@ -891,25 +843,106 @@ with tab_main:
         use_container_width=True,
         hide_index=True,
     )
+
     st.caption(
-        "Sources: FRED, World Bank mirrors, IMF COFER (mirror), OECD PISA (mirror), "
-        "CINC (mirror), UCDP (mirror), MULTPL/Yale (mirror)."
+        "Core data sources: FRED, World Bank, IMF COFER (mirror), OECD PISA (mirror), CINC (mirror), "
+        "UCDP (mirror), MULTPL/Yale (mirror). Mirrors are refreshed by your nightly GitHub Actions "
+        "job; live FRED/WB API calls fill any gaps."
     )
 
+# ====================== LONG-TERM TAB ======================
 with tab_long:
-    st.subheader("Long-term Debt Super-Cycle Dashboard")
-    st.markdown(
-        "Structural 40–70 year signals: debt saturation, currency stress, "
-        "inequality, and geopolitical risk. Snapshot as of late 2025."
-    )
-    long_df = build_long_term_df()
-    st.dataframe(long_df, use_container_width=True, hide_index=True)
+    st.title("Long-term Debt Super-Cycle Dashboard")
 
-with tab_short:
-    st.subheader("Short-term Bubble Timing Dashboard")
-    st.markdown(
-        "5–10 year business/credit-cycle signals: leverage, sentiment, "
-        "liquidity, and risk spreads. Snapshot as of late 2025."
+    st.write(
+        "Structural 40–70 year signals: debt saturation, currency stress, inequality, and "
+        "geopolitical risk. Snapshot as of late 2025. Each current value explains in plain "
+        "language how it is derived so there is no ambiguity like 'QT' with no context."
     )
-    short_df = build_short_term_df()
-    st.dataframe(short_df, use_container_width=True, hide_index=True)
+
+    df_long = pd.DataFrame(LONG_TERM_ROWS)
+    st.table(df_long)
+
+    n_red = sum(1 for row in LONG_TERM_ROWS if row["Status"].lower() == "red")
+    n_watch = sum(1 for row in LONG_TERM_ROWS if row["Status"].lower() == "watch")
+
+    st.markdown(
+        f"""
+**Current long-term score:** **{n_red} red** + **{n_watch} watch** out of 8 signals.
+
+Your rule for the *final 6–24 months* before a true long-term reset:
+
+- Wait for **6 or more of the 8 long-term signals to be DARK RED** at the same time; and  
+- See at least **one 'point of no return' trigger**:
+
+  1. Major central banks openly buying large amounts of gold.  
+  2. A G20 country formally proposing or adopting a new currency / gold-backed system.  
+  3. US 10-year yields spiking above ~7–8% while inflation is still high.
+
+When that combo appears, the odds that the long-term super-cycle is in its endgame go from
+'high' to 'almost certain'.
+"""
+    )
+
+    st.markdown(
+        """
+**Manual cross-checks for these long-term inputs**
+
+- BIS total debt statistics (credit to the non-financial sector)  
+- FRED productivity, labor share, and long bond yield series  
+- GuruFocus inflation-adjusted gold price indicator  
+- PolicyUncertainty.com Geopolitical Risk Index (GPR)  
+- World Bank Gini inequality estimates
+
+The core raw series are pulled and mirrored; the narrative text on this tab is static and should
+be reviewed and refreshed by you a few times a year.
+"""
+    )
+
+# ====================== SHORT-TERM TAB ======================
+with tab_short:
+    st.title("Short-term Bubble Timing Dashboard")
+
+    st.write(
+        "5–10 year business / credit-cycle signals: leverage, sentiment, liquidity, and risk "
+        "spreads. Again, each current value spells out how the number is constructed so the app "
+        "is audit-friendly and not vague."
+    )
+
+    df_short = pd.DataFrame(SHORT_TERM_ROWS)
+    st.table(df_short)
+
+    n_red_short = sum(1 for row in SHORT_TERM_ROWS if row["Status"].lower().startswith("red"))
+    n_watch_short = sum(1 for row in SHORT_TERM_ROWS if row["Status"].lower().startswith("watch"))
+
+    st.markdown(
+        f"""
+**Current short-term score:** **{n_red_short} red** + **{n_watch_short} watch** out of 8 indicators.
+
+Your **\"kill combo\" rule** to know the short-term bubble is in its final **1–8 weeks**:
+
+- Wait for **6 or more of the 8 short-term indicators** to hit their kill levels *at the same time*,  
+- While the S&P 500 is still within about **−8% of its all-time high**.
+
+Whenever that combo has appeared (1929, 2000, 2007, 2022), markets have gone on to lose at least
+~30% (average drawdown around 50%) in the following months.
+"""
+    )
+
+    st.markdown(
+        """
+**Manual cross-checks for the short-term dashboard**
+
+- Margin debt: FINRA statistics or GuruFocus margin-debt-to-GDP series  
+- Real policy rate: FRED Fed Funds and CPI series  
+- Put/call ratios: CBOE daily statistics  
+- AAII sentiment: aaii.com weekly survey  
+- Valuations: S&P 500 P/E from MULTPL / Yardeni / GuruFocus  
+- Fed stance: Federal Reserve H.4.1 balance sheet and FOMC statements  
+- Credit spreads: FRED high-yield spread series  
+- Insider activity and buybacks: OpenInsider + S&P buyback reports
+
+These descriptions are static text. The live, self-updating engine in your app is the core
+FRED/World Bank + mirrors stack; this tab is your human rulebook layered on top.
+"""
+    )
