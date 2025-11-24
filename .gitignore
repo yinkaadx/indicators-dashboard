@@ -23,3 +23,7 @@ node_modules/
 # Not ignored: data/ (we want mirrors committed by CI)
 
 env312/
+
+.streamlit/secrets.toml
+
+.streamlit/secrets.toml
