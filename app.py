@@ -102,7 +102,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Permanent banner at very top
+# Permanent banner
 st.markdown(
     """
 <div class="banner-box">
@@ -139,7 +139,7 @@ RSS_KEYWORDS_CB_GOLD: List[str] = [
     "central banks buying gold",
     "gold reserves increase",
     "purchases of gold reserves",
-    "pboC gold",
+    "pboc gold",
     "ecb gold purchases",
 ]
 RSS_KEYWORDS_G20_GOLD: List[str] = [
@@ -152,7 +152,7 @@ RSS_KEYWORDS_G20_GOLD: List[str] = [
 ]
 
 # =============================================================================
-# INDICATORS / THRESHOLDS / UNITS (from your original app)
+# INDICATORS / THRESHOLDS / UNITS
 # =============================================================================
 INDICATORS: List[str] = [
     "Yield curve",
@@ -319,25 +319,25 @@ FRED_MAP: Dict[str, str] = {
     "Building permits": "PERMIT",
     "Unemployment claims": "ICSA",
     "LEI (Conference Board Leading Economic Index)": "USSLIND",
-    "GDP": "A191RL1Q225SBEA",  # Real GDP YoY %
+    "GDP": "A191RL1Q225SBEA",
     "Capacity utilization": "TCU",
-    "Inflation": "CPIAUCSL",  # compute YoY
-    "Retail sales": "RSXFS",  # compute YoY
+    "Inflation": "CPIAUCSL",
+    "Retail sales": "RSXFS",
     "Nonfarm payrolls": "PAYEMS",
-    "Wage growth": "CES0500000003",  # compute YoY
-    "Credit growth": "TOTBKCR",  # compute YoY
+    "Wage growth": "CES0500000003",
+    "Credit growth": "TOTBKCR",
     "Fed funds futures": "FEDFUNDS",
     "Short rates": "TB3MS",
-    "Industrial production": "INDPRO",  # compute YoY
-    "Consumer/investment spending": "PCE",  # compute YoY
-    "Productivity growth": "OPHNFB",  # compute YoY (or level)
+    "Industrial production": "INDPRO",
+    "Consumer/investment spending": "PCE",
+    "Productivity growth": "OPHNFB",
     "Debt-to-GDP": "GFDEGDQ188S",
     "Real rates": "REAINTRATREARAT10Y",
     "Trade balance": "BOPGSTB",
-    "Central bank printing (M2)": "M2SL",  # YoY
-    "Currency devaluation": "DTWEXBGS",  # YoY proxy (dollar index)
+    "Central bank printing (M2)": "M2SL",
+    "Currency devaluation": "DTWEXBGS",
     "Fiscal deficits": "FYFSD",
-    "Debt growth": "GFDEBTN",  # YoY
+    "Debt growth": "GFDEBTN",
     "Income growth": "A067RO1Q156NBEA",
     "Debt service": "TDSP",
     "Military spending": "A063RC1Q027SBEA",
@@ -353,7 +353,7 @@ WB_US: Dict[str, str] = {
     "Military spending": "MS.MIL.XPND.GD.ZS",
     "Working population": "SP.POP.1564.TO.ZS",
     "Innovation": "GB.XPD.RSDV.GD.ZS",
-    "Competitiveness index / Competitiveness (WEF)": "LP.LPI.OVRL.XQ",  # proxy
+    "Competitiveness index / Competitiveness (WEF)": "LP.LPI.OVRL.XQ",
 }
 
 WB_SHARE_CODES: Dict[str, str] = {
@@ -407,14 +407,25 @@ def load_fred_mirror_series(series_id: str) -> pd.Series:
     return s
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def fred_series(series_id: str) -> pd.Series:
+    """
+    Safe FRED fetch:
+    1) Use local mirror first.
+    2) If mirror empty, try FRED API.
+    3) If rate-limited / error, return empty series (no crash).
+    """
     s = load_fred_mirror_series(series_id)
     if not s.empty:
         return s
-    raw = fred.get_series(series_id)
-    s2 = pd.Series(raw).dropna()
-    s2.index = pd.to_datetime(s2.index)
-    return s2
+    try:
+        raw = fred.get_series(series_id)
+        s2 = pd.Series(raw).dropna()
+        s2.index = pd.to_datetime(s2.index)
+        return s2
+    except Exception:
+        # Too many requests / bad series / network: return empty
+        return pd.Series(dtype=float)
 
 
 def yoy_from_series(s: pd.Series) -> Tuple[float, float]:
@@ -473,7 +484,6 @@ def fred_history(series_id: str, mode: str = "level", n: int = 24) -> List[float
 
 
 def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]]:
-    # Mirror first
     mpath = os.path.join(WB_DIR, f"{country}_{code}.csv")
     df = load_csv(mpath)
     if not df.empty and "val" in df.columns:
@@ -489,7 +499,6 @@ def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]
             .tolist()
         )
         return cur, prev, src, hist
-    # Fallback online
     try:
         t = wbdata.get_dataframe({code: "val"}, country=country).dropna()
         if t.empty:
@@ -505,7 +514,6 @@ def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]
 
 
 def wb_share_series(code: str) -> Tuple[pd.DataFrame, str]:
-    # Mirror first
     us = load_csv(os.path.join(WB_DIR, f"USA_{code}.csv"))
     wd = load_csv(os.path.join(WB_DIR, f"WLD_{code}.csv"))
     if not us.empty and not wd.empty:
@@ -522,7 +530,6 @@ def wb_share_series(code: str) -> Tuple[pd.DataFrame, str]:
             )
             seed = is_seed(os.path.join(WB_DIR, f"USA_{code}.csv"))
             return df[["date", "share"]], ("Mirror: WB (seed)" if seed else "Mirror: WB")
-    # Online fallback
     try:
         us_online = wbdata.get_dataframe({code: "us"}, country="USA").dropna()
         w_online = wbdata.get_dataframe({code: "w"}, country="WLD").dropna()
@@ -571,7 +578,6 @@ def sp500_pe_latest() -> Tuple[float, float, str, List[float]]:
     return mirror_latest_csv(path, "pe", "date", numeric_time=False)
 
 
-# Threshold helpers
 def parse_simple_threshold(txt: object) -> Tuple[Optional[str], Optional[float]]:
     if not isinstance(txt, str):
         return None, None
@@ -596,9 +602,6 @@ def evaluate_signal(current: float, threshold_text: str) -> Tuple[str, str]:
 # =============================================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def live_margin_gdp_details() -> Tuple[float, float]:
-    """
-    Returns (margin_debt_pct_of_GDP, month_over_month_change_pct_points).
-    """
     try:
         url = f"https://www.alphavantage.co/query?function=MARGIN_STATISTICS&apikey={AV_KEY}"
         j = SESSION.get(url, timeout=10).json()
@@ -610,14 +613,13 @@ def live_margin_gdp_details() -> Tuple[float, float]:
             prev_debt_billions = float(
                 rows[1]["debit_balances_in_customers_securities_margin_accounts"]
             ) / 1e3
-            gdp_trillions = 28.8  # Approx US nominal GDP; stable anchor
+            gdp_trillions = 28.8
             cur_pct = cur_debt_billions / gdp_trillions * 100.0
             prev_pct = prev_debt_billions / gdp_trillions * 100.0
             delta_pct = cur_pct - prev_pct
             return round(cur_pct, 2), round(delta_pct, 2)
     except Exception:
         pass
-    # Fallback: single point, no trend
     try:
         url = f"https://www.alphavantage.co/query?function=MARGIN_STATISTICS&apikey={AV_KEY}"
         j = SESSION.get(url, timeout=10).json()
@@ -628,7 +630,7 @@ def live_margin_gdp_details() -> Tuple[float, float]:
         cur_pct = debt_billions / gdp_trillions * 100.0
         return round(cur_pct, 2), float("nan")
     except Exception:
-        return 3.88, float("nan")  # known recent ballpark
+        return 3.88, float("nan")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -639,18 +641,14 @@ def live_margin_gdp() -> float:
 
 @st.cache_data(ttl=3600)
 def live_put_call_details() -> Tuple[float, float, List[float]]:
-    """
-    Returns (latest_put_call, average_last_5_days, last_5_values).
-    """
     try:
         df = pd.read_csv(
             "https://cdn.cboe.com/api/global/delayed_quotes/options/totalpc.csv",
             skiprows=2,
         )
-        # First column is date, second is ratio; we take last 5 rows
         df = df.dropna()
         vals = pd.to_numeric(df.iloc[:, 1], errors="coerce").dropna().tolist()
-        vals = vals[:30]  # limit
+        vals = vals[:30]
         if not vals:
             return 0.87, 0.87, []
         latest = float(vals[0])
@@ -669,9 +667,6 @@ def live_put_call() -> float:
 
 @st.cache_data(ttl=7200)
 def live_aaii_bulls_details() -> Tuple[float, List[float]]:
-    """
-    Returns (latest_bullish_pct, last_4_weeks_values).
-    """
     try:
         df = pd.read_csv("https://www.aaii.com/files/surveys/sentiment.csv")
         df = df.dropna()
@@ -682,7 +677,7 @@ def live_aaii_bulls_details() -> Tuple[float, List[float]]:
             .astype(float)
             .tolist()
         )
-        bulls = bulls[::-1]  # oldest->newest => reverse; AAII often newest at bottom
+        bulls = bulls[::-1]
         if not bulls:
             return 32.6, []
         last = bulls[-1]
@@ -700,7 +695,6 @@ def live_aaii_bulls() -> float:
 
 @st.cache_data(ttl=3600)
 def live_sp500_pe() -> float:
-    # Daily P/E from FMP
     try:
         url = f"https://financialmodelingprep.com/api/v3/quote/^GSPC?apikey={FMP_KEY}"
         return round(requests.get(url, timeout=10).json()[0]["pe"], 2)
@@ -710,7 +704,6 @@ def live_sp500_pe() -> float:
 
 @st.cache_data(ttl=3600)
 def live_gold_price() -> float:
-    # Spot XAU/USD from Alpha Vantage
     try:
         url = (
             f"https://www.alphavantage.co/query?"
@@ -724,16 +717,12 @@ def live_gold_price() -> float:
 
 @st.cache_data(ttl=3600)
 def live_hy_spread_series() -> Tuple[float, float]:
-    """
-    Returns (latest_spread_bps, one_month_ago_spread_bps).
-    """
     try:
         s = fred_series("BAMLH0A0HYM2")
         s = s.dropna()
         if s.empty:
             return 317.0, float("nan")
         latest = float(s.iloc[-1])
-        # approx 21 trading days ~ 1 month
         if len(s) > 21:
             month_ago = float(s.iloc[-22])
         else:
@@ -751,7 +740,6 @@ def live_hy_spread() -> float:
 
 @st.cache_data(ttl=3600)
 def live_real_30y() -> float:
-    # Daily 30Y nominal - YoY CPI
     try:
         nom_series = fred_series("DGS30")
         cpi_series = fred_series("CPIAUCSL").pct_change(12) * 100.0
@@ -767,10 +755,6 @@ def live_real_30y() -> float:
 
 @st.cache_data(ttl=3600)
 def live_real_fed_rate_series() -> Tuple[float, float]:
-    """
-    Real Fed funds rate: Fed funds - CPI YoY (monthly, official).
-    Returns (latest_real, previous_real).
-    """
     try:
         ff = fred_series("FEDFUNDS")
         cpi_yoy = fred_series("CPIAUCSL").pct_change(12) * 100.0
@@ -792,9 +776,6 @@ def live_real_fed_rate_official() -> float:
 
 @st.cache_data(ttl=3600)
 def live_vix_level() -> float:
-    """
-    Daily VIX close from yfinance.
-    """
     try:
         data = yf.download("^VIX", period="5d", interval="1d", progress=False)
         if data.empty:
@@ -806,9 +787,6 @@ def live_vix_level() -> float:
 
 @st.cache_data(ttl=3600)
 def live_spx_level_and_ath() -> Tuple[float, float]:
-    """
-    Returns (latest_close, rolling_all_time_high) for S&P 500.
-    """
     try:
         data = yf.download("^GSPC", period="10y", interval="1d", progress=False)
         if data.empty:
@@ -823,9 +801,6 @@ def live_spx_level_and_ath() -> Tuple[float, float]:
 
 @st.cache_data(ttl=3600)
 def live_us10y_and_cpi_yoy() -> Tuple[float, float]:
-    """
-    Returns (latest_10y_yield, latest_cpi_yoy).
-    """
     try:
         dgs10 = fred_series("DGS10")
         cpi_yoy = fred_series("CPIAUCSL").pct_change(12) * 100.0
@@ -840,10 +815,6 @@ def live_us10y_and_cpi_yoy() -> Tuple[float, float]:
 
 @st.cache_data(ttl=7200)
 def live_insider_buy_ratio() -> Tuple[float, int, int]:
-    """
-    Uses FMP insider-trading API to approximate insider BUY ratio globally.
-    Returns (buy_ratio, buy_count, sell_count) where ratio = buys / (buys + sells).
-    """
     try:
         url = f"https://financialmodelingprep.com/api/v4/insider-trading?page=0&limit=200&apikey={FMP_KEY}"
         data = SESSION.get(url, timeout=10).json()
@@ -871,12 +842,6 @@ def live_insider_buy_ratio() -> Tuple[float, int, int]:
 
 @st.cache_data(ttl=43200)
 def scan_rss_for_keywords() -> Dict[str, object]:
-    """
-    Very lightweight RSS keyword scan for:
-      - central banks openly buying gold
-      - G20 / BRICS gold-backed system
-    Returns dict with booleans + sample matched headlines.
-    """
     cb_gold_hit = False
     g20_gold_hit = False
     cb_titles: List[str] = []
@@ -888,8 +853,6 @@ def scan_rss_for_keywords() -> Dict[str, object]:
             r.raise_for_status()
             content = r.content
             root = ET.fromstring(content)
-
-            # RSS 2.0 <channel><item> / Atom <entry>
             items = list(root.iter("item")) + list(root.iter("{http://www.w3.org/2005/Atom}entry"))
             for item in items:
                 title_el = item.find("title") or item.find("{http://www.w3.org/2005/Atom}title")
@@ -949,9 +912,7 @@ tab_core, tab_long, tab_short = st.tabs(
     ["📊 Core Econ Mirror", "🌍 Long-Term Super-Cycle", "⚡ Short-Term Bubble Timing"]
 )
 
-# =============================================================================
-# CORE TAB — original dashboard logic
-# =============================================================================
+# ---------------- CORE TAB ----------------
 with tab_core:
     st.subheader("📊 Core Econ Mirror indicators")
     st.caption(
@@ -969,13 +930,11 @@ with tab_core:
         src: str = "—"
         hist: List[float] = []
 
-        # World Bank direct indicators
         if ind in WB_US:
             c, p, s, h = wb_last_two(WB_US[ind], "USA")
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, s, h
 
-        # Shares (USA vs World)
         if ind == "GDP share" and pd.isna(cur):
             series, ssrc = wb_share_series("NY.GDP.MKTP.CD")
             if not series.empty:
@@ -1004,7 +963,6 @@ with tab_core:
                     .tolist()
                 )
 
-        # Special mirrors / proxies
         if ind.startswith("Education (PISA scores"):
             path_pisa = os.path.join(DATA_DIR, "pisa_math_usa.csv")
             c, p, s, h = mirror_latest_csv(path_pisa, "pisa_math_mean_usa", "year", numeric_time=True)
@@ -1035,7 +993,6 @@ with tab_core:
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, s, h
 
-        # FRED-backed indicators
         if ind in FRED_MAP and pd.isna(cur):
             series_id = FRED_MAP[ind]
             mode = "level"
@@ -1083,16 +1040,13 @@ with tab_core:
         "CINC (mirror), UCDP (mirror), MULTPL/Yale (mirror)."
     )
 
-# =============================================================================
-# LONG-TERM TAB — live super-cycle dashboard + Point of No Return engine
-# =============================================================================
+# ---------------- LONG-TERM TAB ----------------
 with tab_long:
     st.markdown("### 🌍 Long-Term Debt Super-Cycle — Live (40–70 years)")
     st.caption("Updates hourly • Official sources only • No daily noise")
 
     usd_vs_gold = 1000.0 / gold_spot if gold_spot else float("nan")
 
-    # Core long-term summary table (high-level)
     long_rows = [
         {
             "Signal": "Total Debt/GDP (Private + Public + Foreign)",
@@ -1165,14 +1119,11 @@ with tab_long:
     with st.expander(
         "SUPER-CYCLE POINT OF NO RETURN (final 6–24 months before reset)", expanded=False
     ):
-        # Dark-red logic for 7 long-term signals
-        total_debt_gdp_est = 355.0  # BIS-style aggregate estimate (% of GDP)
+        total_debt_gdp_est = 355.0
         total_debt_dark = total_debt_gdp_est >= 400.0
 
-        gold_dark = gold_spot >= 2600  # rough "new real ATH vs most fiats"
-
+        gold_dark = gold_spot >= 2600
         usd_vs_gold_dark = not pd.isna(usd_vs_gold) and usd_vs_gold < 0.10
-
         real30_dark = (real_30y_live > 5.0) or (real_30y_live < -5.0)
 
         gpr_est = 180.0
@@ -1181,10 +1132,10 @@ with tab_long:
         gini_est = 0.41
         gini_dark = gini_est >= 0.50
 
-        wage_share_est = 52.0  # % of GDP, rough
+        wage_share_est = 52.0
         wage_share_dark = wage_share_est < 50.0
 
-        productivity_est = 1.5  # rough long-run
+        productivity_est = 1.5
         productivity_dark = productivity_est < 0.0
 
         long_dark_rows = [
@@ -1236,7 +1187,6 @@ with tab_long:
 
         dark_red_count = sum(r["Dark red?"] == "🔴" for r in long_dark_rows)
 
-        # Point-of-no-return triggers
         cb_gold_trigger = bool(rss_hits.get("central_banks_gold", False))
         g20_trigger = bool(rss_hits.get("g20_gold_system", False))
         us10y_forced_default = (us10y_yield >= 7.0) and (cpi_yoy >= 3.0)
@@ -1299,9 +1249,7 @@ This RSS logic is keyword-based only (headline scanning). Always <b>verify manua
                 }
             )
 
-# =============================================================================
-# SHORT-TERM TAB — live bubble timing dashboard + FINAL TOP KILL COMBO
-# =============================================================================
+# ---------------- SHORT-TERM TAB ----------------
 with tab_short:
     st.markdown("### ⚡ Short-Term Bubble Timing — Live (5–10 year cycle)")
     st.caption("Updates hourly • Official frequencies only • Designed for the 6-of-8 kill combo")
@@ -1387,11 +1335,9 @@ with tab_short:
         "Short-term bubble is advanced but not yet in the 6-of-8 kill zone."
     )
 
-    # ---- FINAL TOP KILL COMBO ENGINE ----
     with st.expander(
         "FINAL TOP KILL COMBO (6+ reds = sell 80–90% stocks this week)", expanded=False
     ):
-        # Conditions (kill state = True/False for each of the 8)
         margin_kill = (margin_gdp_cur >= 3.5) and (
             not pd.isna(margin_gdp_delta) and margin_gdp_delta < 0
         )
@@ -1400,20 +1346,15 @@ with tab_short:
             not pd.isna(real_fed_prev) and real_fed_cur > real_fed_prev
         )
 
-        # Put/call: multiple days < 0.65
         pc_series = put_call_last5 if put_call_last5 else [put_call]
         put_call_kill = len(pc_series) >= 3 and all(v < 0.65 for v in pc_series[:3])
 
-        # AAII bulls: >60% for 2+ weeks
         aaii_series = aaii_last4 if aaii_last4 else [aaii_cur]
         aaii_kill = len(aaii_series) >= 2 and all(v > 60 for v in aaii_series[-2:])
 
         pe_kill = pe_live > 30.0
-
-        # Insider buying ratio <10% => 90%+ selling
         insider_kill = insider_buy_ratio < 0.10
 
-        # HY spreads still tight (<400 bps) but widening 50+ bps in a month
         hy_delta = (
             hy_spread_cur - hy_spread_month_ago
             if not pd.isna(hy_spread_month_ago)
@@ -1421,15 +1362,13 @@ with tab_short:
         )
         hy_kill = (hy_spread_cur < 400.0) and (not pd.isna(hy_delta) and hy_delta >= 50.0)
 
-        # VIX still <20 (complacency)
         vix_kill = vix_level < 20.0
 
-        # S&P within -8% of ATH
         if spx_ath <= 0:
             spx_drawdown_pct = 0.0
         else:
             spx_drawdown_pct = (spx_last / spx_ath - 1.0) * 100.0
-        near_ath = spx_drawdown_pct >= -8.0  # still within -8% of ATH
+        near_ath = spx_drawdown_pct >= -8.0
 
         kill_signals = [
             {
