@@ -102,11 +102,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Permanent banner
+# Permanent banner at very top
 st.markdown(
     """
 <div class="banner-box">
-<strong>Current regime:</strong> Late-stage melt-up (short-term) inside late-stage debt super-cycle (long-term). 
+<strong>Current regime:</strong> Late-stage melt-up (short-term) inside late-stage debt super-cycle (long-term).
 Ride stocks with <strong>20–30% cash</strong> + <strong>30–40% gold/BTC</strong> permanent.
 </div>
 """,
@@ -424,7 +424,6 @@ def fred_series(series_id: str) -> pd.Series:
         s2.index = pd.to_datetime(s2.index)
         return s2
     except Exception:
-        # Too many requests / bad series / network: return empty
         return pd.Series(dtype=float)
 
 
@@ -1019,7 +1018,7 @@ with tab_core:
         rows.append(
             {
                 "Indicator": ind,
-                "Threshold": threshold_txt,
+                "Threshold (red/green line)": threshold_txt,
                 "Current": cur,
                 "Previous": prev,
                 "Unit": unit,
@@ -1031,7 +1030,17 @@ with tab_core:
 
     df_out = pd.DataFrame(rows)
     st.dataframe(
-        df_out[["Indicator", "Threshold", "Current", "Previous", "Unit", "Signal", "Source"]],
+        df_out[
+            [
+                "Indicator",
+                "Threshold (red/green line)",
+                "Current",
+                "Previous",
+                "Unit",
+                "Signal",
+                "Source",
+            ]
+        ],
         use_container_width=True,
         hide_index=True,
     )
@@ -1219,7 +1228,7 @@ with tab_long:
         st.markdown(
             """
 <div class="kill-box">
-<b>Rule:</b> When <b>6+ dark red</b> + <b>one no-return trigger</b> → go <b>80–100% gold/bitcoin/cash/hard assets</b> and 
+<b>Rule:</b> When <b>6+ dark red</b> + <b>one no-return trigger</b> → go <b>80–100% gold/bitcoin/cash/hard assets</b> and
 do not touch stocks/bonds for <b>5–15 years</b>.
 </div>
 """,
@@ -1235,19 +1244,20 @@ This RSS logic is keyword-based only (headline scanning). Always <b>verify manua
             unsafe_allow_html=True,
         )
 
-        with st.expander("Debug logs — super-cycle RSS + yields", expanded=False):
-            st.write("RSS hits raw object:")
-            st.json(rss_hits)
-            st.write(
-                {
-                    "us10y_yield": us10y_yield,
-                    "cpi_yoy": cpi_yoy,
-                    "total_debt_gdp_est": total_debt_gdp_est,
-                    "usd_vs_gold_ratio": usd_vs_gold,
-                    "gold_spot": gold_spot,
-                    "real_30y_live": real_30y_live,
-                }
-            )
+        # Debug (no nested expander)
+        st.markdown("#### Debug logs — super-cycle RSS + yields")
+        st.write("RSS hits raw object:")
+        st.json(rss_hits)
+        st.write(
+            {
+                "us10y_yield": us10y_yield,
+                "cpi_yoy": cpi_yoy,
+                "total_debt_gdp_est": total_debt_gdp_est,
+                "usd_vs_gold_ratio": usd_vs_gold,
+                "gold_spot": gold_spot,
+                "real_30y_live": real_30y_live,
+            }
+        )
 
 # ---------------- SHORT-TERM TAB ----------------
 with tab_short:
@@ -1335,6 +1345,7 @@ with tab_short:
         "Short-term bubble is advanced but not yet in the 6-of-8 kill zone."
     )
 
+    # FINAL TOP KILL COMBO
     with st.expander(
         "FINAL TOP KILL COMBO (6+ reds = sell 80–90% stocks this week)", expanded=False
     ):
@@ -1373,55 +1384,67 @@ with tab_short:
         kill_signals = [
             {
                 "Kill #": 1,
-                "Condition": "Margin Debt % GDP ≥ 3.5% and falling MoM",
+                "Indicator": "Margin Debt % GDP",
+                "Kill threshold": "≥3.5% & falling MoM",
                 "Current": f"{margin_gdp_cur:.2f}% (ΔMoM {margin_gdp_delta:+.2f} ppts)",
                 "Kill active?": "🔴" if margin_kill else "⚪",
             },
             {
                 "Kill #": 2,
-                "Condition": "Real Fed Funds Rate ≥ +1.5% and rising",
+                "Indicator": "Real Fed Funds Rate",
+                "Kill threshold": "≥+1.5% & rising",
                 "Current": f"{real_fed_cur:+.2f}% (prev {real_fed_prev:+.2f}%)",
                 "Kill active?": "🔴" if real_fed_kill else "⚪",
             },
             {
                 "Kill #": 3,
-                "Condition": "CBOE Total Put/Call < 0.65 for multiple days",
+                "Indicator": "CBOE Total Put/Call",
+                "Kill threshold": "<0.65 for multiple days",
                 "Current": f"Last: {put_call_cur:.3f}, avg(5d) {put_call_avg5:.3f}",
                 "Kill active?": "🔴" if put_call_kill else "⚪",
             },
             {
                 "Kill #": 4,
-                "Condition": "AAII Bullish % >60% for 2+ weeks",
+                "Indicator": "AAII Bullish %",
+                "Kill threshold": ">60% for 2+ weeks",
                 "Current": f"Last: {aaii_cur:.1f}%, last 4: {aaii_last4}",
                 "Kill active?": "🔴" if aaii_kill else "⚪",
             },
             {
                 "Kill #": 5,
-                "Condition": "S&P 500 Trailing P/E still >30",
+                "Indicator": "S&P 500 Trailing P/E",
+                "Kill threshold": ">30x",
                 "Current": f"{pe_live:.2f}x",
                 "Kill active?": "🔴" if pe_kill else "⚪",
             },
             {
                 "Kill #": 6,
-                "Condition": "Insider buying ratio <10% (90%+ selling)",
-                "Current": f"Buy ratio: {insider_buy_ratio*100:.1f}% (buys={insider_buys}, sells={insider_sells})",
+                "Indicator": "Insider buying ratio",
+                "Kill threshold": "<10% (90%+ selling)",
+                "Current": f"{insider_buy_ratio*100:.1f}% (buys={insider_buys}, sells={insider_sells})",
                 "Kill active?": "🔴" if insider_kill else "⚪",
             },
             {
                 "Kill #": 7,
-                "Condition": "HY spreads <400 bps but widening 50+ bps in a month",
+                "Indicator": "HY spreads",
+                "Kill threshold": "<400 bps & widening ≥50 bps in 1m",
                 "Current": f"{hy_spread_cur:.1f} bps (Δ1m {hy_delta:+.1f} bps)",
                 "Kill active?": "🔴" if hy_kill else "⚪",
             },
             {
                 "Kill #": 8,
-                "Condition": "VIX still <20 (complacency)",
+                "Indicator": "VIX",
+                "Kill threshold": "<20 (complacency)",
                 "Current": f"{vix_level:.2f}",
                 "Kill active?": "🔴" if vix_kill else "⚪",
             },
         ]
         df_kill = pd.DataFrame(kill_signals)
-        st.dataframe(df_kill, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_kill[["Kill #", "Indicator", "Kill threshold", "Current", "Kill active?"]],
+            use_container_width=True,
+            hide_index=True,
+        )
 
         kill_count = sum(row["Kill active?"] == "🔴" for row in kill_signals)
 
@@ -1433,7 +1456,7 @@ with tab_short:
         st.markdown(
             """
 <div class="kill-box">
-When <b>6+ kill signals</b> are red <b>AND</b> the S&P 500 is still within <b>−8% of its all-time high</b> → 
+When <b>6+ kill signals</b> are red <b>AND</b> the S&P 500 is still within <b>−8% of its all-time high</b> →
 <b>SELL 80–90% of stocks this week.</b> Historical hit rate: <b>100% since 1929</b>.
 </div>
 """,
@@ -1450,30 +1473,30 @@ When <b>6+ kill signals</b> are red <b>AND</b> the S&P 500 is still within <b>�
             unsafe_allow_html=True,
         )
 
-        with st.expander("Debug logs — kill combo engine", expanded=False):
-            st.write(
-                {
-                    "margin_gdp_cur": margin_gdp_cur,
-                    "margin_gdp_delta": margin_gdp_delta,
-                    "real_fed_cur": real_fed_cur,
-                    "real_fed_prev": real_fed_prev,
-                    "put_call_last5": put_call_last5,
-                    "aaii_last4": aaii_last4,
-                    "pe_live": pe_live,
-                    "insider_buy_ratio": insider_buy_ratio,
-                    "insider_buys": insider_buys,
-                    "insider_sells": insider_sells,
-                    "hy_spread_cur": hy_spread_cur,
-                    "hy_spread_month_ago": hy_spread_month_ago,
-                    "hy_delta": hy_delta,
-                    "vix_level": vix_level,
-                    "spx_last": spx_last,
-                    "spx_ath": spx_ath,
-                    "spx_drawdown_pct": spx_drawdown_pct,
-                    "near_ath": near_ath,
-                    "kill_count": kill_count,
-                }
-            )
+        # Debug (no nested expander)
+        st.markdown("#### Debug logs — kill combo engine")
+        st.write(
+            {
+                "margin_gdp_cur": margin_gdp_cur,
+                "margin_gdp_delta": margin_gdp_delta,
+                "real_fed_cur": real_fed_cur,
+                "real_fed_prev": real_fed_prev,
+                "put_call_last5": put_call_last5,
+                "aaii_last4": aaii_last4,
+                "pe_live": pe_live,
+                "insider_buy_ratio": insider_buy_ratio,
+                "insider_buys": insider_buys,
+                "insider_sells": insider_sells,
+                "hy_spread_cur": hy_spread_cur,
+                "hy_spread_month_ago": hy_spread_month_ago,
+                "vix_level": vix_level,
+                "spx_last": spx_last,
+                "spx_ath": spx_ath,
+                "spx_drawdown_pct": spx_drawdown_pct,
+                "near_ath": near_ath,
+                "kill_count": kill_count,
+            }
+        )
 
         st.markdown(
             """
