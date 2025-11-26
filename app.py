@@ -1,4 +1,4 @@
-from __future__ import annotations
+from **future** import annotations
 
 import os
 import re
@@ -198,19 +198,26 @@ time_col: str,
 numeric_time: bool = False,
 ) -> Tuple[float, float, str, List[float]]:
 df = load_csv(path)
-if df.empty or value_col not in df.columns:
-return float("nan"), float("nan"), "—", []
 
 ```
+# If file missing, columns absent, or completely empty → safe default
+if (
+    df.empty
+    or value_col not in df.columns
+    or time_col not in df.columns
+):
+    return float("nan"), float("nan"), "Mirror empty", []
+
+# Parse time axis
 if numeric_time:
     df[time_col] = pd.to_numeric(df[time_col], errors="coerce")
 else:
-    df[time_col] = pd.to_datetime(
-        df[time_col], format="%Y-%m-%d", errors="coerce"
-    )
+    df[time_col] = pd.to_datetime(df[time_col], format="%Y-%m-%d", errors="coerce")
 
+# Drop rows with bad time or value, sort
 df = df.dropna(subset=[time_col, value_col]).sort_values(time_col)
 
+# After cleaning, if nothing left → safe default
 if df.empty:
     return float("nan"), float("nan"), "Mirror empty", []
 
@@ -223,6 +230,7 @@ hist = (
     .astype(float)
     .tolist()
 )
+
 return cur, prev, src, hist
 ```
 
@@ -248,33 +256,29 @@ df = tables[0]
 # Last row is latest
 val_raw = df.iloc[-1, 1]
 margin_bil = to_float(val_raw) / 1e3  # millions -> billions
-
-```
-    # Use FRED nominal GDP if BEA scraping fails
-    gdp_tril = fetch_us_gdp_trillions()[0]
-    if math.isnan(gdp_tril):
-        gdp_tril = 28.0
-
-    margin_pct_gdp = margin_bil / (gdp_tril * 1000) * 100.0
-    return margin_bil, margin_pct_gdp, "FINRA direct"
+# Use FRED nominal GDP if BEA scraping fails
+gdp_tril = fetch_us_gdp_trillions()[0]
+if math.isnan(gdp_tril):
+gdp_tril = 28.0
+margin_pct_gdp = margin_bil / (gdp_tril * 1000) * 100.0
+return margin_bil, margin_pct_gdp, "FINRA direct"
 except Exception:
-    try:
-        cur, _, src, _ = mirror_latest_csv(
-            os.path.join(DATA_DIR, "margin_finra.csv"),
-            "debit_bil",
-            "date",
-            numeric_time=False,
-        )
-        # Mirror stores billions directly
-        margin_bil = cur
-        gdp_tril, _ = fetch_us_gdp_trillions()
-        if math.isnan(gdp_tril):
-            gdp_tril = 28.0
-        margin_pct_gdp = margin_bil / (gdp_tril * 1000) * 100.0
-        return margin_bil, margin_pct_gdp, src
-    except Exception:
-        return float("nan"), float("nan"), "Mirror failed"
-```
+try:
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "margin_finra.csv"),
+"debit_bil",
+"date",
+numeric_time=False,
+)
+# Mirror stores billions directly
+margin_bil = cur
+gdp_tril, _ = fetch_us_gdp_trillions()
+if math.isnan(gdp_tril):
+gdp_tril = 28.0
+margin_pct_gdp = margin_bil / (gdp_tril * 1000) * 100.0
+return margin_bil, margin_pct_gdp, src
+except Exception:
+return float("nan"), float("nan"), "Mirror failed"
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_us_gdp_trillions() -> Tuple[float, str]:
@@ -289,17 +293,14 @@ latest = float(series.iloc[-1]) / 1000.0
 return round(latest, 2), "FRED GDP"
 except Exception:
 pass
-
-```
 # Mirror fallback
 cur, _, src, _ = mirror_latest_csv(
-    os.path.join(DATA_DIR, "us_gdp_nominal.csv"),
-    "gdp_trillions",
-    "date",
-    numeric_time=False,
+os.path.join(DATA_DIR, "us_gdp_nominal.csv"),
+"gdp_trillions",
+"date",
+numeric_time=False,
 )
 return float(cur), src
-```
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_real_fed_funds_rate() -> Tuple[float, str]:
@@ -378,16 +379,13 @@ if m:
 return float(m.group(1)), "multpl.com live"
 except Exception:
 pass
-
-```
 cur, _, src, _ = mirror_latest_csv(
-    os.path.join(DATA_DIR, "sp500_pe.csv"),
-    "pe",
-    "date",
-    numeric_time=False,
+os.path.join(DATA_DIR, "sp500_pe.csv"),
+"pe",
+"date",
+numeric_time=False,
 )
 return float(cur), src
-```
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_insider_ratio_openinsider() -> Tuple[float, str]:
@@ -402,34 +400,30 @@ table = soup.find("table", {"class": "tinytable"})
 if not table:
 raise ValueError("No insider table")
 rows = table.find_all("tr")
-
-```
-    buys = 0
-    sells = 0
-    for r in rows:
-        tds = r.find_all("td")
-        if len(tds) < 8:
-            continue
-        tx = tds[7].get_text(strip=True)
-        if tx.startswith("P - Purchase"):
-            buys += 1
-        elif tx.startswith("S - Sale"):
-            sells += 1
-
-    total = buys + sells
-    if total == 0:
-        raise ValueError("No trades parsed")
-    pct_buy = buys / total * 100.0
-    return round(pct_buy, 1), "OpenInsider parsed"
+buys = 0
+sells = 0
+for r in rows:
+tds = r.find_all("td")
+if len(tds) < 8:
+continue
+tx = tds[7].get_text(strip=True)
+if tx.startswith("P - Purchase"):
+buys += 1
+elif tx.startswith("S - Sale"):
+sells += 1
+total = buys + sells
+if total == 0:
+raise ValueError("No trades parsed")
+pct_buy = buys / total * 100.0
+return round(pct_buy, 1), "OpenInsider parsed"
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "insider_buy_ratio.csv"),
-        "buy_pct",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "insider_buy_ratio.csv"),
+"buy_pct",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_hy_spread() -> Tuple[float, str]:
@@ -464,32 +458,29 @@ os.path.join(DATA_DIR, "vix_index.csv"),
 numeric_time=False,
 )
 return float(cur), src
-
-```
 try:
-    url = (
-        "https://www.alphavantage.co/query?"
-        "function=TIME_SERIES_DAILY"
-        "&symbol=^VIX"
-        f"&apikey={ALPHAVANTAGE_API_KEY}"
-    )
-    r = SESSION.get(url, timeout=20)
-    data = r.json()
-    ts = data.get("Time Series (Daily)", {})
-    if not ts:
-        raise ValueError("No AV VIX time series")
-    latest_date = sorted(ts.keys())[-1]
-    close = to_float(ts[latest_date]["4. close"])
-    return float(close), "Alpha Vantage ^VIX"
+url = (
+"[https://www.alphavantage.co/query](https://www.alphavantage.co/query)?"
+"function=TIME_SERIES_DAILY"
+"&symbol=^VIX"
+f"&apikey={ALPHAVANTAGE_API_KEY}"
+)
+r = SESSION.get(url, timeout=20)
+data = r.json()
+ts = data.get("Time Series (Daily)", {})
+if not ts:
+raise ValueError("No AV VIX time series")
+latest_date = sorted(ts.keys())[-1]
+close = to_float(ts[latest_date]["4. close"])
+return float(close), "Alpha Vantage ^VIX"
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "vix_index.csv"),
-        "vix",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "vix_index.csv"),
+"vix",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_spx_from_fmp() -> Tuple[float, float, float, float, str]:
@@ -508,48 +499,41 @@ ath_val = max(hist) if hist else cur
 dd = pct_change(ath_val, cur)
 ytd = float("nan")
 return float(cur), float(ath_val), float(dd), float(ytd), src_close
-
-```
 try:
-    url = (
-        f"https://financialmodelingprep.com/api/v3/historical-price-full/"
-        f"^GSPC?timeseries=800&apikey={FMP_API_KEY}"
-    )
-    data = SESSION.get(url, timeout=20).json()
-    hist = data.get("historical", [])
-    if not hist:
-        raise ValueError("No SPX history")
-
-    df = pd.DataFrame(hist)
-    df["date"] = pd.to_datetime(
-        df["date"], format="%Y-%m-%d", errors="coerce"
-    )
-    df = df.sort_values("date")
-    df = df.dropna(subset=["date", "close"])
-
-    close = float(df["close"].iloc[-1])
-    ath = float(df["close"].max())
-    dd = (close / ath - 1.0) * 100.0
-
-    this_year = df[df["date"].dt.year == datetime.now().year]
-    if this_year.empty:
-        ytd = float("nan")
-    else:
-        first = float(this_year["close"].iloc[0])
-        ytd = (close / first - 1.0) * 100.0
-
-    return close, ath, dd, ytd, "FMP ^GSPC"
+url = (
+f"[https://financialmodelingprep.com/api/v3/historical-price-full/](https://financialmodelingprep.com/api/v3/historical-price-full/)"
+f"^GSPC?timeseries=800&apikey={FMP_API_KEY}"
+)
+data = SESSION.get(url, timeout=20).json()
+hist = data.get("historical", [])
+if not hist:
+raise ValueError("No SPX history")
+df = pd.DataFrame(hist)
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.sort_values("date")
+df = df.dropna(subset=["date", "close"])
+close = float(df["close"].iloc[-1])
+ath = float(df["close"].max())
+dd = (close / ath - 1.0) * 100.0
+this_year = df[df["date"].dt.year == datetime.now().year]
+if this_year.empty:
+ytd = float("nan")
+else:
+first = float(this_year["close"].iloc[0])
+ytd = (close / first - 1.0) * 100.0
+return close, ath, dd, ytd, "FMP ^GSPC"
 except Exception:
-    cur, _, src_close, hist = mirror_latest_csv(
-        os.path.join(DATA_DIR, "spx_close.csv"),
-        "close",
-        "date",
-        numeric_time=False,
-    )
-    ath_val = max(hist) if hist else cur
-    dd = (cur / ath_val - 1.0) * 100.0 if ath_val else float("nan")
-    return float(cur), float(ath_val), float(dd), float("nan"), src_close
-```
+cur, _, src_close, hist = mirror_latest_csv(
+os.path.join(DATA_DIR, "spx_close.csv"),
+"close",
+"date",
+numeric_time=False,
+)
+ath_val = max(hist) if hist else cur
+dd = (cur / ath_val - 1.0) * 100.0 if ath_val else float("nan")
+return float(cur), float(ath_val), float(dd), float("nan"), src_close
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_spx_above_200ma() -> Tuple[float, str]:
@@ -560,27 +544,22 @@ try:
 # Use public chart search to avoid script-blocking.
 url = "[https://stockcharts.com/sc3/ui/?s=$SPXA200R](https://stockcharts.com/sc3/ui/?s=$SPXA200R)"
 html_text = SESSION.get(url, timeout=20).text
-
-```
-    # Look for 'value' like "Value: 22.34"
-    m = re.search(r"Value:\s*([\d\.]+)", html_text)
-    if not m:
-        # fallback pattern
-        m = re.search(r"([\d\.]+)\s*%</text>", html_text)
-
-    if m:
-        return float(m.group(1)), "StockCharts SPXA200R"
-
-    raise ValueError("No SPXA200R value found")
+# Look for 'value' like "Value: 22.34"
+m = re.search(r"Value:\s*([\d.]+)", html_text)
+if not m:
+# fallback pattern
+m = re.search(r"([\d.]+)\s*%</text>", html_text)
+if m:
+return float(m.group(1)), "StockCharts SPXA200R"
+raise ValueError("No SPXA200R value found")
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "spx_above_200d.csv"),
-        "pct",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "spx_above_200d.csv"),
+"pct",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fed_balance_yoy() -> Tuple[float, str]:
@@ -617,33 +596,28 @@ try:
 url = "[https://www.newyorkfed.org/markets/reference-rates/sofr](https://www.newyorkfed.org/markets/reference-rates/sofr)"
 resp = SESSION.get(url, timeout=20)
 html_text = resp.text
-
-```
-    # Very crude parse of the first rate that looks like a number with %
-    m = re.search(r"(\d+\.\d+)\s*percent", html_text, re.IGNORECASE)
-    if not m:
-        m = re.search(r"(\d+\.\d+)\s*%", html_text)
-    sofr = float(m.group(1)) if m else float("nan")
-
-    effr = float("nan")
-    if fred:
-        series = fred.get_series("FEDFUNDS")
-        effr = float(series.iloc[-1])
-
-    spread = (
-        sofr - effr if not math.isnan(sofr) and not math.isnan(effr) else float("nan")
-    )
-    # We treat this as bp for thresholds, but store as raw %
-    return spread * 100.0, "NY Fed SOFR - FEDFUNDS"
+# Very crude parse of the first rate that looks like a number with %
+m = re.search(r"(\d+.\d+)\s*percent", html_text, re.IGNORECASE)
+if not m:
+m = re.search(r"(\d+.\d+)\s*%", html_text)
+sofr = float(m.group(1)) if m else float("nan")
+effr = float("nan")
+if fred:
+series = fred.get_series("FEDFUNDS")
+effr = float(series.iloc[-1])
+spread = sofr - effr if not math.isnan(sofr) and not math.isnan(effr) else float(
+"nan"
+)
+# We treat this as bp for thresholds, but store as raw %
+return spread * 100.0, "NY Fed SOFR - FEDFUNDS"
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "sofr_spread.csv"),
-        "spread_bp",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "sofr_spread.csv"),
+"spread_bp",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def cofer_usd_share_latest() -> Tuple[float, float, str, List[float]]:
@@ -696,16 +670,13 @@ latest = float(series.iloc[-1])
 return latest, "FRED SIPOVGINIUSA"
 except Exception:
 pass
-
-```
 cur, _, src, _ = mirror_latest_csv(
-    os.path.join(DATA_DIR, "gini_usa.csv"),
-    "gini",
-    "date",
-    numeric_time=False,
+os.path.join(DATA_DIR, "gini_usa.csv"),
+"gini",
+"date",
+numeric_time=False,
 )
 return float(cur), src
-```
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_wage_share_usa() -> Tuple[float, str]:
@@ -719,16 +690,13 @@ latest = float(series.iloc[-1])
 return latest, "FRED LABSHPUSA156NRUG"
 except Exception:
 pass
-
-```
 cur, _, src, _ = mirror_latest_csv(
-    os.path.join(DATA_DIR, "labour_share_usa.csv"),
-    "wage_share",
-    "date",
-    numeric_time=False,
+os.path.join(DATA_DIR, "labour_share_usa.csv"),
+"wage_share",
+"date",
+numeric_time=False,
 )
 return float(cur), src
-```
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_productivity_latest() -> Tuple[float, str]:
@@ -741,32 +709,27 @@ resp = SESSION.get(url, timeout=20)
 tables = pd.read_html(StringIO(resp.text))
 # Usually table 3 or similar contains nonfarm business productivity Q/Q
 table = tables[0]
-
-```
-    # Try to find a column that looks like 'Percent change, annual rate'
-    # For safety, just take the last numeric in the table.
-    vals = []
-    for col in table.columns:
-        for v in table[col]:
-            try:
-                vals.append(float(str(v).replace("%", "")))
-            except Exception:
-                continue
-
-    if vals:
-        latest = vals[-1]
-        return float(latest), "BLS PROD2 parsed"
-
-    raise ValueError("No numeric productivity values")
+# Try to find a column that looks like 'Percent change, annual rate'
+# For safety, just take the last numeric in the table.
+vals = []
+for col in table.columns:
+for v in table[col]:
+try:
+vals.append(float(str(v).replace("%", "")))
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "us_productivity.csv"),
-        "prod_yoy",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+continue
+if vals:
+latest = vals[-1]
+return float(latest), "BLS PROD2 parsed"
+raise ValueError("No numeric productivity values")
+except Exception:
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "us_productivity.csv"),
+"prod_yoy",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_gold_spot_fmp() -> Tuple[float, str]:
@@ -781,24 +744,21 @@ os.path.join(DATA_DIR, "gold_spot_usd.csv"),
 numeric_time=False,
 )
 return float(cur), src
-
-```
 try:
-    url = f"https://financialmodelingprep.com/api/v3/quote/XAUUSD?apikey={FMP_API_KEY}"
-    data = SESSION.get(url, timeout=20).json()
-    if not data:
-        raise ValueError("No XAUUSD from FMP")
-    price = float(data[0]["price"])
-    return price, "FMP XAUUSD"
+url = f"[https://financialmodelingprep.com/api/v3/quote/XAUUSD?apikey={FMP_API_KEY}](https://financialmodelingprep.com/api/v3/quote/XAUUSD?apikey={FMP_API_KEY})"
+data = SESSION.get(url, timeout=20).json()
+if not data:
+raise ValueError("No XAUUSD from FMP")
+price = float(data[0]["price"])
+return price, "FMP XAUUSD"
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "gold_spot_usd.csv"),
-        "price",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "gold_spot_usd.csv"),
+"price",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_gold_all_ccy_fmp() -> Tuple[Dict[str, float], str]:
@@ -807,57 +767,49 @@ Gold vs major currencies via FMP quote for:
 XAUUSD, XAUEUR, XAUJPY, XAUGBP, XAUCHF, XAUCNY.
 """
 tickers = ["XAUUSD", "XAUEUR", "XAUJPY", "XAUGBP", "XAUCHF", "XAUCNY"]
-
-```
 if not FMP_API_KEY:
-    # Mirror fallback: store in gold_fx_basket.csv as columns.
-    df = load_csv(os.path.join(DATA_DIR, "gold_fx_basket.csv"))
-    if df.empty:
-        return {}, "Mirror missing"
-
-    df["date"] = pd.to_datetime(
-        df["date"], format="%Y-%m-%d", errors="coerce"
-    )
-    df = df.dropna(subset=["date"])
-    last = df.iloc[-1]
-
-    out = {}
-    for t in tickers:
-        if t in last:
-            out[t] = to_float(last[t])
-    return out, "Mirror gold FX"
-
+# Mirror fallback: store in gold_fx_basket.csv as columns.
+df = load_csv(os.path.join(DATA_DIR, "gold_fx_basket.csv"))
+if df.empty:
+return {}, "Mirror missing"
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.dropna(subset=["date"])
+last = df.iloc[-1]
+out = {}
+for t in tickers:
+if t in last:
+out[t] = to_float(last[t])
+return out, "Mirror gold FX"
 try:
-    url = (
-        f"https://financialmodelingprep.com/api/v3/quote/"
-        f"{','.join(tickers)}?apikey={FMP_API_KEY}"
-    )
-    data = SESSION.get(url, timeout=20).json()
-    out = {}
-    for row in data:
-        sym = row.get("symbol")
-        if sym in tickers:
-            out[sym] = float(row.get("price", float("nan")))
-    if not out:
-        raise ValueError("No gold FX from FMP")
-    return out, "FMP gold FX basket"
+url = (
+f"[https://financialmodelingprep.com/api/v3/quote/](https://financialmodelingprep.com/api/v3/quote/)"
+f"{','.join(tickers)}?apikey={FMP_API_KEY}"
+)
+data = SESSION.get(url, timeout=20).json()
+out = {}
+for row in data:
+sym = row.get("symbol")
+if sym in tickers:
+out[sym] = float(row.get("price", float("nan")))
+if not out:
+raise ValueError("No gold FX from FMP")
+return out, "FMP gold FX basket"
 except Exception:
-    df = load_csv(os.path.join(DATA_DIR, "gold_fx_basket.csv"))
-    if df.empty:
-        return {}, "Mirror failed"
-
-    df["date"] = pd.to_datetime(
-        df["date"], format="%Y-%m-%d", errors="coerce"
-    )
-    df = df.dropna(subset=["date"])
-    last = df.iloc[-1]
-
-    out = {}
-    for t in tickers:
-        if t in last:
-            out[t] = to_float(last[t])
-    return out, "Mirror gold FX"
-```
+df = load_csv(os.path.join(DATA_DIR, "gold_fx_basket.csv"))
+if df.empty:
+return {}, "Mirror failed"
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.dropna(subset=["date"])
+last = df.iloc[-1]
+out = {}
+for t in tickers:
+if t in last:
+out[t] = to_float(last[t])
+return out, "Mirror gold FX"
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_tsy_yields_10_30() -> Tuple[float, float, str]:
@@ -867,29 +819,24 @@ def fetch_tsy_yields_10_30() -> Tuple[float, float, str]:
 ten = float("nan")
 thirty = float("nan")
 src = "Mirror only"
-
-```
 if fred:
-    try:
-        ten = float(fred.get_series("DGS10").iloc[-1])
-        thirty = float(fred.get_series("DGS30").iloc[-1])
-        src = "FRED DGS10/DGS30"
-    except Exception:
-        pass
-
+try:
+ten = float(fred.get_series("DGS10").iloc[-1])
+thirty = float(fred.get_series("DGS30").iloc[-1])
+src = "FRED DGS10/DGS30"
+except Exception:
+pass
 if math.isnan(ten) or math.isnan(thirty):
-    df = load_csv(os.path.join(DATA_DIR, "treasury_yields.csv"))
-    if not df.empty:
-        df["date"] = pd.to_datetime(
-            df["date"], format="%Y-%m-%d", errors="coerce"
-        )
-        df = df.dropna(subset=["date"])
-        ten = to_float(df["y10"].iloc[-1])
-        thirty = to_float(df["y30"].iloc[-1])
-        src = "Mirror treasury_yields.csv"
-
+df = load_csv(os.path.join(DATA_DIR, "treasury_yields.csv"))
+if not df.empty:
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.dropna(subset=["date"])
+ten = to_float(df["y10"].iloc[-1])
+thirty = to_float(df["y30"].iloc[-1])
+src = "Mirror treasury_yields.csv"
 return ten, thirty, src
-```
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def fetch_oil_price_te() -> Tuple[float, str]:
@@ -900,39 +847,34 @@ try:
 url = "[https://tradingeconomics.com/commodity/crude-oil](https://tradingeconomics.com/commodity/crude-oil)"
 resp = SESSION.get(url, timeout=20)
 html_text = resp.text
-
-```
-    m = re.search(
-        r"\"Value\":\s*([\d\.]+)", html_text, re.IGNORECASE | re.DOTALL
-    )
-    if m:
-        price = float(m.group(1))
-        return price, "TradingEconomics crude oil"
-
-    # fallback: parse table
-    tables = pd.read_html(StringIO(html_text))
-    if tables:
-        df = tables[0]
-        vals = []
-        for col in df.columns:
-            for v in df[col]:
-                try:
-                    vals.append(float(str(v).replace(",", "")))
-                except Exception:
-                    continue
-        if vals:
-            return vals[0], "TradingEconomics table"
-
-    raise ValueError("No oil price from TE")
+m = re.search(
+r""Value":\s*([\d.]+)", html_text, re.IGNORECASE | re.DOTALL
+)
+if m:
+price = float(m.group(1))
+return price, "TradingEconomics crude oil"
+# fallback: parse table
+tables = pd.read_html(StringIO(html_text))
+if tables:
+df = tables[0]
+vals = []
+for col in df.columns:
+for v in df[col]:
+try:
+vals.append(float(str(v).replace(",", "")))
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "crude_oil_price.csv"),
-        "price",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+continue
+if vals:
+return vals[0], "TradingEconomics table"
+raise ValueError("No oil price from TE")
+except Exception:
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "crude_oil_price.csv"),
+"price",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_btc_fmp() -> Tuple[float, str]:
@@ -947,24 +889,21 @@ os.path.join(DATA_DIR, "btc_usd.csv"),
 numeric_time=False,
 )
 return float(cur), src
-
-```
 try:
-    url = f"https://financialmodelingprep.com/api/v3/quote/BTCUSD?apikey={FMP_API_KEY}"
-    data = SESSION.get(url, timeout=20).json()
-    if not data:
-        raise ValueError("No BTCUSD from FMP")
-    price = float(data[0]["price"])
-    return price, "FMP BTCUSD"
+url = f"[https://financialmodelingprep.com/api/v3/quote/BTCUSD?apikey={FMP_API_KEY}](https://financialmodelingprep.com/api/v3/quote/BTCUSD?apikey={FMP_API_KEY})"
+data = SESSION.get(url, timeout=20).json()
+if not data:
+raise ValueError("No BTCUSD from FMP")
+price = float(data[0]["price"])
+return price, "FMP BTCUSD"
 except Exception:
-    cur, _, src, _ = mirror_latest_csv(
-        os.path.join(DATA_DIR, "btc_usd.csv"),
-        "price",
-        "date",
-        numeric_time=False,
-    )
-    return float(cur), src
-```
+cur, _, src, _ = mirror_latest_csv(
+os.path.join(DATA_DIR, "btc_usd.csv"),
+"price",
+"date",
+numeric_time=False,
+)
+return float(cur), src
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_farmland_index_mirror() -> Tuple[float, str]:
@@ -975,18 +914,14 @@ try:
 df = load_csv(os.path.join(DATA_DIR, "farmland_index.csv"))
 if df.empty:
 raise ValueError("No farmland mirror CSV")
-
-```
-    df["date"] = pd.to_datetime(
-        df["date"], format="%Y-%m-%d", errors="coerce"
-    )
-    df = df.dropna(subset=["date", "index"])
-
-    latest = float(df["index"].iloc[-1])
-    return latest, "Farmland mirror"
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.dropna(subset=["date", "index"])
+latest = float(df["index"].iloc[-1])
+return latest, "Farmland mirror"
 except Exception:
-    return float("nan"), "Farmland missing"
-```
+return float("nan"), "Farmland missing"
 
 # =============================================================================
 
@@ -1033,6 +968,7 @@ index = val / baseline * 100.0
 
 # Dark red if > 250 (i.e., has more than doubled vs baseline)
 dark = index >= 250.0
+
 return index, dark
 ```
 
@@ -1065,23 +1001,18 @@ try:
 df = load_csv(os.path.join(DATA_DIR, "cb_gold_tonnes.csv"))
 if df.empty:
 return False, "No CB gold mirror"
-
-```
-    df["date"] = pd.to_datetime(
-        df["date"], format="%Y-%m-%d", errors="coerce"
-    )
-    df = df.dropna(subset=["date", "tonnes"])
-
-    if len(df) < 2:
-        return False, "Insufficient CB gold history"
-
-    cur = float(df["tonnes"].iloc[-1])
-    prev = float(df["tonnes"].iloc[0])
-    pct = pct_change(prev, cur)
-    return pct >= 30.0, f"CB gold tonnes change: {pct:.1f}%"
+df["date"] = pd.to_datetime(
+df["date"], format="%Y-%m-%d", errors="coerce"
+)
+df = df.dropna(subset=["date", "tonnes"])
+if len(df) < 2:
+return False, "Insufficient CB gold history"
+cur = float(df["tonnes"].iloc[-1])
+prev = float(df["tonnes"].iloc[0])
+pct = pct_change(prev, cur)
+return pct >= 30.0, f"CB gold tonnes change: {pct:.1f}%"
 except Exception:
-    return False, "CB gold parse error"
-```
+return False, "CB gold parse error"
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def supercycle_news_alerts() -> Tuple[List[str], List[str]]:
@@ -1100,7 +1031,6 @@ try:
             title = entry.get("title", "")
             summary = entry.get("summary", "")
             text = (title + " " + summary).lower()
-
             if "central bank" in text and "gold" in text:
                 cb_titles.append(title)
             if any(k.lower() in text for k in RESET_KEYWORDS):
@@ -1278,6 +1208,7 @@ kill_signals.append(
 )
 
 kill_count = sum(1 for row in kill_signals if row["KILL"] == "KILL")
+
 return kill_count, kill_signals, near_ath
 ```
 
@@ -1289,24 +1220,27 @@ Return (dark_red_count, no_return_count, info_dict)
 # 1. Total Debt/GDP
 margin_bil, _, _ = fetch_margin_debt_finra()
 gdp_tril, _ = fetch_us_gdp_trillions()
-total_debt_gdp = float("nan")
-try:
-# mirror of total debt gdp
-cur, _, _, _ = mirror_latest_csv(
-os.path.join(DATA_DIR, "total_debt_gdp.csv"),
-"debt_gdp_pct",
-"date",
-numeric_time=False,
-)
-total_debt_gdp = float(cur)
-except Exception:
-pass
-total_debt_dark = total_debt_gdp >= 400.0
 
 ```
+total_debt_gdp = float("nan")
+try:
+    # mirror of total debt gdp
+    cur, _, _, _ = mirror_latest_csv(
+        os.path.join(DATA_DIR, "total_debt_gdp.csv"),
+        "debt_gdp_pct",
+        "date",
+        numeric_time=False,
+    )
+    total_debt_gdp = float(cur)
+except Exception:
+    pass
+
+total_debt_dark = total_debt_gdp >= 400.0
+
 # 2. Gold ATH vs major currencies
 gold_spot, _ = fetch_gold_spot_fmp()
 gold_fx_map, _ = fetch_gold_all_ccy_fmp()
+
 gold_all_ath = False
 try:
     df = load_csv(os.path.join(DATA_DIR, "gold_fx_history.csv"))
@@ -1319,11 +1253,12 @@ try:
         gold_all_ath = bool(last_row.get("all_time_high_flag", False))
 except Exception:
     pass
+
 gold_dark = gold_all_ath
 
 # 3. USD vs gold ratio (USD per oz vs 30-year range) – simplified proxy
-usd_vs_gold_ratio = (
-    1.0 / gold_spot if gold_spot not in (0, float("nan")) else float("nan")
+usd_vs_gold_ratio = 1.0 / gold_spot if gold_spot not in (0, float("nan")) else float(
+    "nan"
 )
 usd_vs_gold_dark = (
     not math.isnan(usd_vs_gold_ratio) and usd_vs_gold_ratio <= 0.0001
@@ -1333,6 +1268,7 @@ usd_vs_gold_dark = (
 y10, y30, _ = fetch_tsy_yields_10_30()
 # Use CPI YoY from fetch_real_fed_funds_rate for rough real.
 _, src_real = fetch_real_fed_funds_rate()
+
 real30 = float("nan")
 try:
     if fred:
@@ -1340,6 +1276,7 @@ try:
         real30 = y30 - cpi_yoy
 except Exception:
     pass
+
 real30_dark = not math.isnan(real30) and (real30 >= 5.0 or real30 <= -5.0)
 
 # 5. Geopolitical Risk Index (GPR)
@@ -1371,6 +1308,7 @@ try:
         prod_negative_years = float(negatives) / 4.0
 except Exception:
     pass
+
 productivity_dark = prod_negative_years >= 1.5  # 6+ quarters negative
 
 # 9. USD reserve share drop
@@ -1519,11 +1457,13 @@ f"{short_kill_count}/10 short-term kill signals"
 if short_kill_count < 7
 else f"<span class='red'>{short_kill_count}/10 short-term KILL combo</span>"
 )
+
 long_label = (
 f"{long_dark_count}/11 long-term dark-red signals"
 if long_dark_count < 8
 else f"<span class='red'>{long_dark_count}/11 long-term super-cycle dark-red</span>"
 )
+
 no_return_label = (
 f"{no_return_count}/3 no-return triggers"
 if no_return_count < 2
@@ -1539,6 +1479,7 @@ if short_kill_count >= 4
 else "MID-CYCLE → some froth, but not a full-blown kill cluster."
 )
 )
+
 long_regime_text = (
 "POINT OF NO RETURN → 8+ dark-red + 2 no-return triggers — pivot to hard assets for 5–15 years."
 if (long_dark_count >= 8 and no_return_count >= 2)
@@ -1767,8 +1708,7 @@ st.markdown(
   )
 
   with st.expander(
-  "SUPER-CYCLE POINT OF NO RETURN (final 6–24 months before reset)",
-  expanded=False,
+  "SUPER-CYCLE POINT OF NO RETURN (final 6–24 months before reset)", expanded=False
   ):
   st.markdown(
   """
