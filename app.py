@@ -83,7 +83,7 @@ SESSION.headers.update({"User-Agent": "EconMirror/App"})
 fred = Fred(api_key=FRED_API_KEY)
 
 # =============================================================================
-# INDICATORS / THRESHOLDS / UNITS (from your original app)
+# INDICATORS / THRESHOLDS / UNITS
 # =============================================================================
 INDICATORS: List[str] = [
     "Yield curve",
@@ -612,10 +612,12 @@ with tab_core:
         prev: float = float("nan")
         src: str = "—"
         hist: List[float] = []
+        # World Bank direct indicators
         if ind in WB_US:
             c, p, s, h = wb_last_two(WB_US[ind], "USA")
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, s, h
+        # Shares (USA vs World)
         if ind == "GDP share" and pd.isna(cur):
             series, ssrc = wb_share_series("NY.GDP.MKTP.CD")
             if not series.empty:
@@ -623,7 +625,12 @@ with tab_core:
                 prev = to_float(series.iloc[-2]["share"]) if len(series) > 1 else float("nan")
                 unit = "% of world"
                 src = ssrc
-                hist = pd.to_numeric(series["share"], errors="coerce").tail(24).astype(float).tolist()
+                hist = (
+                    pd.to_numeric(series["share"], errors="coerce")
+                    .tail(24)
+                    .astype(float)
+                    .tolist()
+                )
         if ind == "Trade dominance" and pd.isna(cur):
             series, ssrc = wb_share_series("NE.EXP.GNFS.CD")
             if not series.empty:
@@ -631,20 +638,32 @@ with tab_core:
                 prev = to_float(series.iloc[-2]["share"]) if len(series) > 1 else float("nan")
                 unit = "% of world exports"
                 src = ssrc
-                hist = pd.to_numeric(series["share"], errors="coerce").tail(24).astype(float).tolist()
+                hist = (
+                    pd.to_numeric(series["share"], errors="coerce")
+                    .tail(24)
+                    .astype(float)
+                    .tolist()
+                )
+        # Special mirrors / proxies
         if ind.startswith("Education (PISA scores"):
             path_pisa = os.path.join(DATA_DIR, "pisa_math_usa.csv")
-            c, p, s, h = mirror_latest_csv(path_pisa, "pisa_math_mean_usa", "year", numeric_time=True)
+            c, p, s, h = mirror_latest_csv(
+                path_pisa, "pisa_math_mean_usa", "year", numeric_time=True
+            )
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, "OECD PISA — " + s, h
         if ind.startswith("Power index (CINC"):
             path_cinc = os.path.join(DATA_DIR, "cinc_usa.csv")
-            c, p, s, h = mirror_latest_csv(path_cinc, "cinc_usa", "year", numeric_time=True)
+            c, p, s, h = mirror_latest_csv(
+                path_cinc, "cinc_usa", "year", numeric_time=True
+            )
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, "CINC — " + s, h
         if ind.startswith("Military losses (UCDP"):
             path_ucdp = os.path.join(DATA_DIR, "ucdp_battle_deaths_global.csv")
-            c, p, s, h = mirror_latest_csv(path_ucdp, "ucdp_battle_deaths_global", "year", numeric_time=True)
+            c, p, s, h = mirror_latest_csv(
+                path_ucdp, "ucdp_battle_deaths_global", "year", numeric_time=True
+            )
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, "UCDP — " + s, h
         if ind.startswith("Reserve currency usage"):
@@ -655,6 +674,7 @@ with tab_core:
             c, p, s, h = sp500_pe_latest()
             if not pd.isna(c):
                 cur, prev, src, hist = c, p, s, h
+        # FRED-backed indicators
         if ind in FRED_MAP and pd.isna(cur):
             series_id = FRED_MAP[ind]
             mode = "level"
@@ -673,6 +693,7 @@ with tab_core:
                 cur, prev = c_val, p_val
                 src = "FRED (mirror/online)"
                 hist = fred_history(series_id, mode=mode, n=24)
+        # Build table row
         threshold_txt = THRESHOLDS.get(ind, "—")
         signal_icon, _signal_cls = evaluate_signal(cur, threshold_txt)
         seed_badge = (
@@ -716,9 +737,64 @@ with tab_long:
             "Status": "🔴 Red",
             "Why this matters": "Debt claims >3–4× GDP always forced resets (defaults, inflation, wars).",
         },
-        # ... your full original long-term table
+        {
+            "Signal": "Productivity growth (real, US)",
+            "Current value": "3.3% (Q2, trend weak)",
+            "Red-flag threshold": "<1.5% for a decade",
+            "Status": "🟡 Watch",
+            "Why this matters": "Low productivity means the economy can’t grow out of its debt burden.",
+        },
+        {
+            "Signal": "Gold price (spot, real proxy)",
+            "Current value": f"${gold_spot:,.0f}/oz",
+            "Red-flag threshold": ">2× long-run avg",
+            "Status": "🔴 Red",
+            "Why this matters": "When people lose trust in paper money, they rush into gold at any price.",
+        },
+        {
+            "Signal": "Wage share of GDP",
+            "Current value": "Low vs 1970s",
+            "Red-flag threshold": "Multi-decade downtrend",
+            "Status": "🟡 Watch",
+            "Why this matters": "Falling wage share means rising inequality and political stress.",
+        },
+        {
+            "Signal": "Real 30-year yield",
+            "Current value": f"{real_30y_live:.2f}%",
+            "Red-flag threshold": "Prolonged <2%",
+            "Status": "🟡 Watch",
+            "Why this matters": "Low real yields show financial repression and force people into risk assets.",
+        },
+        {
+            "Signal": "USD vs gold power",
+            "Current value": f"≈{usd_vs_gold:.3f} oz per $1,000",
+            "Red-flag threshold": "<0.25 and falling",
+            "Status": "🔴 Red",
+            "Why this matters": "Shows how much real value the dollar still holds vs hard money.",
+        },
+        {
+            "Signal": "Geopolitical Risk Index (GPR)",
+            "Current value": "≈180",
+            "Red-flag threshold": ">150 and rising",
+            "Status": "🟡 Watch",
+            "Why this matters": "High geopolitical tension + high debt is the classic reset cocktail.",
+        },
+        {
+            "Signal": "US Gini coefficient",
+            "Current value": "≈0.41",
+            "Red-flag threshold": ">0.40 and rising",
+            "Status": "🔴 Red",
+            "Why this matters": "High inequality makes societies fragile and prone to shocks and revolts.",
+        },
     ]
-    # (rest of original long-term tab)
+    df_long = pd.DataFrame(long_rows)
+    st.dataframe(df_long, use_container_width=True, hide_index=True)
+    reds = sum("🔴" in r["Status"] for r in long_rows)
+    watches = sum("🟡" in r["Status"] for r in long_rows)
+    st.success(
+        f"{reds} Red + {watches} Watch → Late-stage super-cycle. "
+        "Not yet the 6-of-8 dark-red kill combo, but deep into the endgame."
+    )
 
 # =============================================================================
 # SHORT-TERM TAB — live bubble timing dashboard
@@ -727,9 +803,74 @@ with tab_short:
     st.markdown("### ⚡ Short-Term Bubble Timing — Live (5–10 year cycle)")
     st.caption("Updates hourly • Official frequencies only • Designed for the 6-of-8 kill combo")
     short_rows = [
-        # your original 7 signals
+        {
+            "Indicator": "Margin debt as % of GDP",
+            "Current value": f"{margin_gdp:.2f}%",
+            "Red-flag threshold": "≥3.5% and rolling over",
+            "Status": "🔴 Red" if margin_gdp >= 3.5 else "🟡 Watch"
+            if margin_gdp >= 3.0
+            else "🟢 Green",
+            "Why this matters": "Leverage shows how many people are borrowing to chase the market.",
+        },
+        {
+            "Indicator": "Real Fed funds rate",
+            "Current value": f"{real_fed_live:+.2f}%",
+            "Red-flag threshold": "Rising above +1.5%",
+            "Status": "🔴 Red" if real_fed_live >= 1.5 else "🟢 Green",
+            "Why this matters": "When money stops being free, bubbles lose their fuel and start to pop.",
+        },
+        {
+            "Indicator": "CBOE total put/call ratio",
+            "Current value": f"{put_call:.3f}",
+            "Red-flag threshold": "<0.70 for days",
+            "Status": "🔴 Red" if put_call < 0.70 else "🟡 Watch"
+            if put_call < 0.80
+            else "🟢 Green",
+            "Why this matters": "Low put/call means nobody is hedging — classic sign of overconfidence.",
+        },
+        {
+            "Indicator": "AAII bullish %",
+            "Current value": f"{aaii:.1f}%",
+            "Red-flag threshold": ">60% for 2 weeks",
+            "Status": "🔴 Red" if aaii > 60 else "🟢 Green"
+            if aaii < 50
+            else "🟡 Watch",
+            "Why this matters": "When everyone is bullish, almost nobody is left to buy more.",
+        },
+        {
+            "Indicator": "S&P 500 trailing P/E",
+            "Current value": f"{pe_live:.2f}x",
+            "Red-flag threshold": ">30× with other reds",
+            "Status": "🔴 Red" if pe_live > 30 else "🟡 Watch"
+            if pe_live > 25
+            else "🟢 Green",
+            "Why this matters": "High P/E means prices are assuming perfection and zero mistakes.",
+        },
+        {
+            "Indicator": "High-yield credit spreads",
+            "Current value": f"{hy_spread_live:.1f} bps",
+            "Red-flag threshold": "<400 bps but widening fast",
+            "Status": "🔴 Red" if hy_spread_live > 400 else "🟢 Green"
+            if hy_spread_live < 350
+            else "🟡 Watch",
+            "Why this matters": "Tight spreads mean junk borrowers get money easily — risk is being ignored.",
+        },
+        {
+            "Indicator": "Insider selling vs buybacks",
+            "Current value": "Heavy selling (qualitative)",
+            "Red-flag threshold": "90%+ selling, buybacks slowing",
+            "Status": "🔴 Red",
+            "Why this matters": "When insiders dump while buybacks slow, smart money is heading for the exit.",
+        },
     ]
-    # (rest of original short-term tab)
+    df_short = pd.DataFrame(short_rows)
+    st.dataframe(df_short, use_container_width=True, hide_index=True)
+    reds_s = sum("🔴" in r["Status"] for r in short_rows)
+    watches_s = sum("🟡" in r["Status"] for r in short_rows)
+    st.warning(
+        f"{reds_s} Red + {watches_s} Watch → Late melt-up phase. "
+        "Short-term bubble is advanced but not yet in the 6-of-8 kill zone."
+    )
 
 st.caption(
     "Live data • Hourly refresh • Fallback mirrors • Built by Yinkaadx + Grok • Nov 2025"
