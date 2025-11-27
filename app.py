@@ -386,6 +386,7 @@ def kill_signal_rows():
             "Signal": "VIX < 20",
             "Value": f"{vix_val:.2f}",
             "KILL": "KILL" if k1 else "",
+            "Why this matters": "Very low volatility means extreme complacency; big tops often form when VIX is quiet.",
         }
     )
 
@@ -395,6 +396,7 @@ def kill_signal_rows():
             "Signal": "SPX within -8% of ATH",
             "Value": f"{dd:.2f}%",
             "KILL": "KILL" if k2 else "",
+            "Why this matters": "Being very close to all-time highs while other risk lights flash is classic final-top behavior.",
         }
     )
 
@@ -404,6 +406,7 @@ def kill_signal_rows():
             "Signal": "SPX YTD > 10%",
             "Value": f"{ytd:.2f}%",
             "KILL": "KILL" if k3 else "",
+            "Why this matters": "Big year-to-date gains mean a lot of good news is already priced in and upside is thinner.",
         }
     )
 
@@ -413,6 +416,7 @@ def kill_signal_rows():
             "Signal": "Margin Debt ≥ 1000B",
             "Value": f"{margin_bil:.1f} B",
             "KILL": "KILL" if k4 else "",
+            "Why this matters": "Huge margin balances mean the market is being held up by borrowed money that can unwind violently.",
         }
     )
 
@@ -422,6 +426,7 @@ def kill_signal_rows():
             "Signal": "HY Spread < 400 bps",
             "Value": f"{hy:.2f}",
             "KILL": "KILL" if k5 else "",
+            "Why this matters": "When junk bonds trade as if they are almost risk-free, investors are underpricing default risk.",
         }
     )
 
@@ -431,6 +436,7 @@ def kill_signal_rows():
             "Signal": "Real Fed Funds ≥ 1.5%",
             "Value": f"{real_ff:.2f}%",
             "KILL": "KILL" if k6 else "",
+            "Why this matters": "Positive, high real policy rates squeeze credit and usually end late-stage bull markets.",
         }
     )
 
@@ -440,6 +446,7 @@ def kill_signal_rows():
             "Signal": "Put/Call < 0.70",
             "Value": f"{pc:.3f}",
             "KILL": "KILL" if k7 else "",
+            "Why this matters": "A very low put/call ratio shows traders are crowding into calls and ignoring hedging.",
         }
     )
 
@@ -449,6 +456,7 @@ def kill_signal_rows():
             "Signal": "AAII Bulls > 45%",
             "Value": f"{aaii_val:.1f}%",
             "KILL": "KILL" if k8 else "",
+            "Why this matters": "When retail sentiment is heavily bullish, forward returns tend to drop sharply.",
         }
     )
 
@@ -458,6 +466,7 @@ def kill_signal_rows():
             "Signal": "% SPX above 200d < 25%",
             "Value": f"{breadth:.1f}%",
             "KILL": "KILL" if k9 else "",
+            "Why this matters": "Thin breadth means only a few mega-caps are holding the index up while most stocks weaken.",
         }
     )
 
@@ -470,6 +479,7 @@ def kill_signal_rows():
             "Signal": "Fed BS YoY ≤ -5% OR SOFR spread ≥ 50 bp",
             "Value": f"{fed_yoy:.2f}% / {sofr_bp:.1f} bp",
             "KILL": "KILL" if k10 else "",
+            "Why this matters": "Aggressive QT or funding stress is how something in a leveraged system suddenly breaks.",
         }
     )
 
@@ -538,56 +548,67 @@ def long_term_rows(reset_flag: bool):
             "Signal": "Total Debt / GDP high",
             "Value": f"{debt_val:.1f}" if not np.isnan(debt_val) else "No data",
             "Dark red?": "🔴" if debt_flag else "🟡",
+            "Why this matters": "Very high debt relative to GDP means future growth is capped and crises force restructurings.",
         },
         {
             "Signal": "Gold breaking ATH",
             "Value": f"{gold_val:,.0f}" if not np.isnan(gold_val) else "No data",
             "Dark red?": "🔴" if gold_flag else "🟡",
+            "Why this matters": "Gold making new highs against fiat tells you trust in paper money is fading.",
         },
         {
             "Signal": "USD reserve share falling",
             "Value": f"{usd_share:.1f}%" if not np.isnan(usd_share) else "No data",
             "Dark red?": "🔴" if usd_flag else "🟡",
+            "Why this matters": "When central banks quietly diversify away from USD, the existing monetary order is weakening.",
         },
         {
             "Signal": "Real assets basket elevated",
             "Value": f"{real_assets_val:.2f}" if not np.isnan(real_assets_val) else "No data",
             "Dark red?": "🔴" if real_assets_flag else "🟡",
+            "Why this matters": "When real assets outpace financial assets for years, capital is voting against paper claims.",
         },
         {
             "Signal": "Gini high",
             "Value": f"{gini_val:.3f}" if not np.isnan(gini_val) else "No data",
             "Dark red?": "🔴" if gini_flag else "🟡",
+            "Why this matters": "Extreme inequality makes social and political pressure for a reset much stronger.",
         },
         {
             "Signal": "Wage share low",
             "Value": f"{wage_val:.1f}%" if not np.isnan(wage_val) else "No data",
             "Dark red?": "🔴" if wage_flag else "🟡",
+            "Why this matters": "When labour’s share of income is squeezed, populist backlashes and radical policy shifts follow.",
         },
         {
             "Signal": "Productivity stagnation",
             "Value": f"{prod_val:.2f}" if not np.isnan(prod_val) else "No data",
             "Dark red?": "🔴" if prod_flag else "🟡",
+            "Why this matters": "Low or negative productivity means growth is borrowed from the future via debt and money printing.",
         },
         {
             "Signal": "Geopolitical risk high",
             "Value": f"{gpr_val:.1f}" if not np.isnan(gpr_val) else "No data",
             "Dark red?": "🔴" if gpr_flag else "🟡",
+            "Why this matters": "High geopolitical risk raises odds of sanctions, wars and regime changes that trigger resets.",
         },
         {
             "Signal": "S&P P/E extreme",
             "Value": f"{pe_val:.2f}" if not np.isnan(pe_val) else "No data",
             "Dark red?": "🔴" if pe_flag else "🟡",
+            "Why this matters": "Very high P/E ratios mean future returns are pulled forward and downside risk is large.",
         },
         {
             "Signal": "HY spreads very tight",
             "Value": f"{hy_val:.2f}" if not np.isnan(hy_val) else "No data",
             "Dark red?": "🔴" if hy_flag else "🟡",
+            "Why this matters": "When junk credit trades like it’s safe, the system is blind to default risk until it snaps.",
         },
         {
             "Signal": "Official reset / CB gold regime",
             "Value": cb_gold_desc + (" + RESET" if reset_flag else ""),
             "Dark red?": "🔴" if (cb_gold_flag or reset_flag_int) else "🟡",
+            "Why this matters": "A hard gold move plus explicit reset decisions is the last confirmation of a super-cycle turn.",
         },
     ]
 
@@ -641,36 +662,31 @@ def render_banner(kill_count: int, dark_count: int, no_return_count: int):
     dd = spx_drawdown_pct()
     ath = spx_ath()
     near_ath = False
-    if not np.isnan(spx) and not np.isnan(ath) and ath > 0:
-        near_ath = spx >= ath * 0.92
+    if not np.isnan(dd):
+        near_ath = dd > -8.0
 
     summary = regime_summary(kill_count, near_ath, dark_count, no_return_count)
 
-    top_html = f"""
+    banner_html = f"""
 <div style="background:#111111;border-radius:14px;padding:18px 22px;border:1px solid #333333;margin-bottom:18px;">
   <div style="font-size:20px;font-weight:700;color:#ffffff;margin-bottom:4px;">
-    CURRENT REGIME:
+    CURRENT REGIME
   </div>
-  <div style="font-size:16px;color:#dddddd;margin-bottom:4px;">
-    <span style="color:#ff6666;font-weight:700;">{kill_count}/10</span> short-term kill •
-    <span style="color:#ff9966;font-weight:700;">{dark_count}/11</span> long-term dark-red •
-    <span style="color:#ffcc66;font-weight:700;">{no_return_count}/3</span> no-return
-  </div>
-  <div style="font-size:14px;color:#bbbbbb;margin-bottom:6px;">
-    SPX: {spx:,.0f} &nbsp;|&nbsp; Drawdown: {dd:.2f}% &nbsp;|&nbsp; ATH: {ath:,.0f}
+  <div style="font-size:14px;color:#dddddd;margin-bottom:6px;">
+    SPX: {spx:,.0f} | Drawdown: {dd:.2f}% | ATH: {ath:,.0f} | Kill: {kill_count}/10 | Dark: {dark_count}/11 | No-return: {no_return_count}/3
   </div>
   <div style="font-size:14px;color:#ffffff;">
     {summary}
   </div>
 </div>
 """
-    st.markdown(top_html, unsafe_allow_html=True)
+    st.markdown(banner_html, unsafe_allow_html=True)
 
     if kill_count >= 7 and near_ath:
         st.markdown(
             """
-<div style="background:#290000;border:2px solid #ff4444;border-radius:12px;padding:16px;margin-bottom:12px;color:#ffcccc;font-weight:700;text-align:center;">
-FINAL TOP ZONE: 7+ short-term kill signals while SPX is near ATH → I plan to sell 80–90% of equity risk this week.
+<div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center;">
+7+ KILL SIGNALS + WITHIN -8% OF ATH → SELL 80–90% STOCKS THIS WEEK
 </div>
 """,
             unsafe_allow_html=True,
@@ -679,8 +695,8 @@ FINAL TOP ZONE: 7+ short-term kill signals while SPX is near ATH → I plan to s
     if dark_count >= 8 and no_return_count >= 2:
         st.markdown(
             """
-<div style="background:#261300;border:2px solid #ff9900;border-radius:12px;padding:16px;margin-bottom:12px;color:#ffe6cc;font-weight:700;text-align:center;">
-POINT OF NO RETURN: 8+ long-term dark-red + 2+ no-return triggers → I tilt 80–100% of long-horizon capital into hard assets for 5–15 years.
+<div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center;">
+8+ DARK RED + 2 NO-RETURN → 80–100% GOLD/BTC/CASH/HARD ASSETS FOR 5–15 YEARS
 </div>
 """,
             unsafe_allow_html=True,
@@ -702,6 +718,39 @@ def render_core_tab():
     real_ff = real_fed_rate()
     usd_share_val, usd_prev_val, _ = cofer_usd_share_latest()
     real_assets_val = real_assets_index()
+
+    unrate = fred_series("UNRATE")
+    unrate_val = float(unrate.iloc[-1]) if unrate is not None and len(unrate) > 0 else float("nan")
+
+    cpi = fred_series("CPIAUCSL")
+    cpi_yoy_val = float(cpi.pct_change(12).iloc[-1] * 100.0) if cpi is not None and len(cpi) > 12 else float("nan")
+
+    gdp = fred_series("GDP")
+    gdp_val = float(gdp.iloc[-1]) / 1000.0 if gdp is not None and len(gdp) > 0 else float("nan")
+
+    pce = fred_series("PCEPI")
+    pce_yoy_val = float(pce.pct_change(12).iloc[-1] * 100.0) if pce is not None and len(pce) > 12 else float("nan")
+
+    dfed = fred_series("DFF")
+    dfed_val = float(dfed.iloc[-1]) if dfed is not None and len(dfed) > 0 else float("nan")
+
+    twex = fred_series("DTWEXBGS")
+    twex_val = float(twex.iloc[-1]) if twex is not None and len(twex) > 0 else float("nan")
+
+    g10y = fred_series("DGS10")
+    g10y_val = float(g10y.iloc[-1]) if g10y is not None and len(g10y) > 0 else float("nan")
+
+    g30y = fred_series("DGS30")
+    g30y_val = float(g30y.iloc[-1]) if g30y is not None and len(g30y) > 0 else float("nan")
+
+    m2 = fred_series("M2SL")
+    m2_val = float(m2.iloc[-1]) if m2 is not None and len(m2) > 0 else float("nan")
+
+    hous = fred_series("CSUSHPISA")
+    hous_val = float(hous.iloc[-1]) if hous is not None and len(hous) > 0 else float("nan")
+
+    stox = fred_series("SP500")
+    stox_val = float(stox.iloc[-1]) if stox is not None and len(stox) > 0 else float("nan")
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -731,46 +780,42 @@ def render_core_tab():
     st.markdown("---")
 
     tbl_rows = [
-        ["SPX", f"{spx:,.0f}", "Index level", "FMP ^GSPC"],
-        ["SPX Drawdown %", f"{dd:.2f}%", "From ATH", "FMP ^GSPC"],
-        ["SPX YTD %", f"{ytd:.2f}%", "This calendar year", "FMP ^GSPC"],
-        ["VIX", f"{vix_val:.2f}", "Volatility", "FMP ^VIX"],
-        ["HY Spread", f"{hy_val:.2f}", "Approx OAS", "FRED BAMLH0A0HYM2"],
-        ["Real Fed Funds", f"{real_ff:.2f}%", "FEDFUNDS − CPI YoY", "FRED"],
-        ["Gold (USD/oz)", f"{gold_val:,.0f}", "Spot", "FMP XAUUSD"],
-        ["Oil WTI", f"{oil_val:.2f}", "Spot", "FMP WTIUSD"],
-        ["BTCUSD", f"{btc_val:,.0f}", "Spot", "FMP BTCUSD"],
-        ["SPX P/E", f"{pe_val:.2f}", "Trailing PE", "Mirror pe_sp500.csv"],
-        ["Margin Debt", f"{margin_val:.1f} B", "FINRA debit bal", "Mirror margin_finra.csv"],
-        [
-            "USD Reserve Share",
-            f"{usd_share_val:.1f}%",
-            "IMF COFER",
-            "Mirror imf_cofer_usd_share.csv",
-        ],
-        [
-            "% SPX above 200d",
-            f"{breadth_val:.1f}%",
-            "Breadth",
-            "Mirror spx_percent_above_200dma.csv",
-        ],
-        [
-            "Real Assets Index",
-            f"{real_assets_val:.2f}" if not np.isnan(real_assets_val) else "No data",
-            "Gold/Oil/BTC basket",
-            "FMP + mirror",
-        ],
+        ["SPX level", f"{spx:,.0f}", "Core equity index", "FMP ^GSPC"],
+        ["SPX drawdown %", f"{dd:.2f}%", "Distance from ATH", "FMP ^GSPC"],
+        ["SPX YTD %", f"{ytd:.2f}%", "Year-to-date performance", "FMP ^GSPC"],
+        ["VIX", f"{vix_val:.2f}", "Implied volatility", "FMP ^VIX"],
+        ["HY spread", f"{hy_val:.2f}", "High-yield credit risk", "FRED BAMLH0A0HYM2"],
+        ["Real Fed Funds", f"{real_ff:.2f}%", "Policy rate minus inflation", "FRED FEDFUNDS/CPIAUCSL"],
+        ["Gold spot", f"{gold_val:,.0f}", "Monetary metal", "FMP XAUUSD"],
+        ["Oil WTI", f"{oil_val:.2f}", "Energy benchmark", "FMP WTIUSD"],
+        ["BTCUSD", f"{btc_val:,.0f}", "Digital asset proxy", "FMP BTCUSD"],
+        ["SPX P/E", f"{pe_val:.2f}", "Valuation multiple", "Mirror pe_sp500.csv"],
+        ["Margin debt", f"{margin_val:.1f} B", "Leverage in equity market", "Mirror margin_finra.csv"],
+        ["USD reserve share", f"{usd_share_val:.1f}%", "Dollar share of FX reserves", "Mirror imf_cofer_usd_share.csv"],
+        ["% SPX above 200d", f"{breadth_val:.1f}%", "Breadth of uptrend", "Mirror spx_percent_above_200dma.csv"],
+        ["Real assets index", f"{real_assets_val:.2f}" if not np.isnan(real_assets_val) else "No data", "Gold/oil/BTC basket", "FMP + mirrors"],
+        ["US unemployment rate", f"{unrate_val:.2f}%" if not np.isnan(unrate_val) else "No data", "Slack in labour market", "FRED UNRATE"],
+        ["CPI YoY", f"{cpi_yoy_val:.2f}%" if not np.isnan(cpi_yoy_val) else "No data", "Headline inflation", "FRED CPIAUCSL"],
+        ["PCE YoY", f"{pce_yoy_val:.2f}%" if not np.isnan(pce_yoy_val) else "No data", "Core inflation proxy", "FRED PCEPI"],
+        ["US GDP (T USD)", f"{gdp_val:.2f}" if not np.isnan(gdp_val) else "No data", "Nominal GDP", "FRED GDP"],
+        ["Fed Funds effective", f"{dfed_val:.2f}%" if not np.isnan(dfed_val) else "No data", "Policy rate", "FRED DFF"],
+        ["Trade-weighted USD", f"{twex_val:.2f}" if not np.isnan(twex_val) else "No data", "Dollar strength vs basket", "FRED DTWEXBGS"],
+        ["10Y Treasury yield", f"{g10y_val:.2f}%" if not np.isnan(g10y_val) else "No data", "Long-term rate", "FRED DGS10"],
+        ["30Y Treasury yield", f"{g30y_val:.2f}%" if not np.isnan(g30y_val) else "No data", "Very long-term rate", "FRED DGS30"],
+        ["M2 money stock", f"{m2_val:,.0f}" if not np.isnan(m2_val) else "No data", "Broad money supply", "FRED M2SL"],
+        ["US house price index", f"{hous_val:.2f}" if not np.isnan(hous_val) else "No data", "Housing cycle", "FRED CSUSHPISA"],
+        ["Legacy S&P index", f"{stox_val:.2f}" if not np.isnan(stox_val) else "No data", "Historical proxy", "FRED SP500"],
     ]
 
     core_df = pd.DataFrame(
-        tbl_rows, columns=["Indicator", "Current", "Notes", "Source"]
+        tbl_rows, columns=["Indicator", "Current", "Why it matters", "Source"]
     )
     st.dataframe(core_df, use_container_width=True, hide_index=True)
 
 
 def render_short_term_tab():
     kill_count, rows = kill_signal_rows()
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows)[["Signal", "Value", "KILL", "Why this matters"]]
     st.dataframe(df, use_container_width=True, hide_index=True)
     st.markdown(f"**Kill combo active:** {kill_count}/10")
 
@@ -785,12 +830,21 @@ def render_long_term_tab():
     if new_flag != current_flag:
         set_reset_flag(new_flag)
     dark_count, no_return_count, rows = long_term_rows(get_reset_flag())
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows)[["Signal", "Value", "Dark red?", "Why this matters"]]
     st.dataframe(df, use_container_width=True, hide_index=True)
     st.markdown(
         f"**Dark red signals:** {dark_count}/11 &nbsp;&nbsp; | &nbsp;&nbsp; **No-return triggers:** {no_return_count}/3",
         unsafe_allow_html=True,
     )
+    if dark_count >= 8 and no_return_count >= 2:
+        st.markdown(
+            """
+<div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center;">
+8+ DARK RED + 2 NO-RETURN → 80–100% GOLD/BTC/CASH/HARD ASSETS FOR 5–15 YEARS
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
 
 st.markdown(
