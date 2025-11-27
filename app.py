@@ -1534,55 +1534,56 @@ def build_long_term_table() -> Tuple[pd.DataFrame, int, int]:
 
 with tab_long:
     # NEW LONG-TERM RULE LOGIC + BOX
-st.markdown(
-    """
-    **New Unbreakable Timing Rule — Long-Term (Super-Cycle End / No-Return Zone)**  
-    You only flip the regime when **8 or more dark-red super-cycle signals** are active  
-    **AND at least two of the three “no-return” triggers are ON**:  
+    st.markdown(
+        """
+        **New Unbreakable Timing Rule — Long-Term (Super-Cycle End / No-Return Zone)**  
+        You only flip the regime when **8 or more dark-red super-cycle signals** are active  
+        **AND at least two of the three “no-return” triggers are ON**:
 
-    1. **Reserve share collapse** (USD reserve usage rolling over hard),  
-    2. **Real assets explosion** (gold/oil/BTC/farmland basket ripping vs fiat),  
-    3. **Official reset event** (laws, treaties, or FX regime changes).  
+        1. **Reserve share collapse** (USD reserve usage rolling over hard),  
+        2. **Real assets explosion** (gold/oil/BTC/farmland basket ripping vs fiat),  
+        3. **Official reset event** (laws, treaties, or FX regime changes).  
 
-    When that happens, the rule is:  
-    **→ Go 80–100% into gold/Bitcoin/cash/hard assets for 5–15 years.**
-    """
-)
+        When that happens, the rule is:  
+        **→ Go 80–100% into gold/Bitcoin/cash/hard assets for 5–15 years.**
+        """
+    )
 
-if dark_red_count >= 8 and no_return_count >= 2:
-    reset_box_html = """
-    <div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center">
-    8+ DARK-RED SUPER-CYCLE SIGNALS + 2 NO-RETURN TRIGGERS<br/>
-    (RESERVE SHARE COLLAPSE · REAL ASSETS EXPLOSION · OFFICIAL RESET EVENT)<br/>
-    → RULE: 80–100% GOLD/BITCOIN/CASH/HARD ASSETS FOR 5–15 YEARS
-    </div>
-    """
-    st.markdown(reset_box_html, unsafe_allow_html=True)
+    if dark_red_count >= 8 and no_return_count >= 2:
+        reset_box_html = """
+        <div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center">
+        8+ DARK-RED SUPER-CYCLE SIGNALS + 2 NO-RETURN TRIGGERS<br/>
+        (RESERVE SHARE COLLAPSE · REAL ASSETS EXPLOSION · OFFICIAL RESET EVENT)<br/>
+        → RULE: 80–100% GOLD/BITCOIN/CASH/HARD ASSETS FOR 5–15 YEARS
+        </div>
+        """
+        st.markdown(reset_box_html, unsafe_allow_html=True)
+
 
 # =============================================================================
 # SHORT-TERM TAB RENDER
 # =============================================================================
 with tab_short:
     # NEW SHORT-TERM RULE LOGIC + BOX
-st.markdown(
-    """
-    **New Unbreakable Timing Rule — Short-Term (Burst Ahead / Take Profits)**  
-    You only act when **7 out of 10 kill signals** are active  
-    **while the S&P 500 is still within −8% of its all-time high (or green year-to-date)**.  
+    st.markdown(
+        """
+        **New Unbreakable Timing Rule — Short-Term (Burst Ahead / Take Profits)**  
+        You only act when **7 out of 10 kill signals** are active  
+        **while the S&P 500 is still within –8% of its all-time high (or green year-to-date)**.
 
-    At that point, the rule is:  
-    **→ Sell 80–90% of your stock exposure and move into cash/gold/Bitcoin/defensives.**
-    """
-)
+        At that point, the rule is:  
+        **→ Sell 80–90% of your stock exposure and move into cash/gold/Bitcoin/defensives.**
+        """
+    )
 
-if kill_count >= 7 and spx_drawdown >= -8.0:
-    kill_box_html = """
-    <div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center">
-    7 OUT OF 10 KILL SIGNALS + S&P WITHIN −8% OF ATH (OR GREEN YTD)<br/>
-    → RULE: SELL 80–90% OF STOCKS AND LOCK IN THIS CYCLE'S GAINS
-    </div>
-    """
-    st.markdown(kill_box_html, unsafe_allow_html=True)
+    if kill_count >= 7 and spx_drawdown >= -8.0:
+        kill_box_html = """
+        <div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center">
+        7 OUT OF 10 KILL SIGNALS + S&P WITHIN –8% OF ATH (OR GREEN YTD)<br/>
+        → RULE: SELL 80–90% OF STOCKS AND LOCK IN THIS CYCLE'S GAINS
+        </div>
+        """
+        st.markdown(kill_box_html, unsafe_allow_html=True)
 
 # =============================================================================
 # GLOBAL REGIME BANNER
