@@ -1536,16 +1536,14 @@ with tab_long:
     # NEW LONG-TERM RULE LOGIC + BOX
     st.markdown(
         """
-        **New Unbreakable Timing Rule — Long-Term (Super-Cycle End / No-Return Zone)**  
-        You only flip the regime when **8 or more dark-red super-cycle signals** are active  
-        **AND at least two of the three “no-return” triggers are ON**:
+        **New Unbreakable Timing Rules**
 
-        1. **Reserve share collapse** (USD reserve usage rolling over hard),  
-        2. **Real assets explosion** (gold/oil/BTC/farmland basket ripping vs fiat),  
-        3. **Official reset event** (laws, treaties, or FX regime changes).  
+        **Short-term — When to time the burst ahead (sell 80–90%)**  
+        You now wait for **7-out-of-10 kill signals** while **S&P is still within –8% of ATH (or green YTD).**
 
-        When that happens, the rule is:  
-        **→ Go 80–100% into gold/Bitcoin/cash/hard assets for 5–15 years.**
+        **Long-term — When the super-cycle really ends (go 80–100% hard assets forever)**  
+        You now wait for **8+ dark-red** AND **at least two of the three no-return triggers**  
+        (reserve share collapse + real assets explosion + official reset event).
         """
     )
 
@@ -1567,12 +1565,14 @@ with tab_short:
     # NEW SHORT-TERM RULE LOGIC + BOX
     st.markdown(
         """
-        **New Unbreakable Timing Rule — Short-Term (Burst Ahead / Take Profits)**  
-        You only act when **7 out of 10 kill signals** are active  
-        **while the S&P 500 is still within –8% of its all-time high (or green year-to-date)**.
+        **New Unbreakable Timing Rules**
 
-        At that point, the rule is:  
-        **→ Sell 80–90% of your stock exposure and move into cash/gold/Bitcoin/defensives.**
+        **Short-term — When to time the burst ahead (sell 80–90%)**  
+        You now wait for **7-out-of-10 kill signals** while **S&P is still within –8% of ATH (or green YTD).**
+
+        **Long-term — When the super-cycle really ends (go 80–100% hard assets forever)**  
+        You now wait for **8+ dark-red** AND **at least two of the three no-return triggers**  
+        (reserve share collapse + real assets explosion + official reset event).
         """
     )
 
