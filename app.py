@@ -1,52 +1,55 @@
 import os
 import io
 import json
-import requests
-import pandas as pd
-import numpy as np
-import streamlit as st
 from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+import requests
+import streamlit as st
 from fredapi import Fred
 
-st.set_page_config(page_title="Econ Mirror", layout="wide")
 
-if not os.path.exists("data"):
-    os.makedirs("data", exist_ok=True)
+def auto_create(path: str, content: str) -> None:
+    directory = os.path.dirname(path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory, exist_ok=True)
+    if not os.path.exists(path):
+        with open(path, "w") as f:
+            f.write(content.strip() + "\n")
 
-cofer_path = "data/imf_cofer_usd_share.csv"
-if not os.path.exists(cofer_path):
-    cofer_default = """
+
+auto_create(
+    "data/imf_cofer_usd_share.csv",
+    """
 date,usd_share
 2023-12-31,58.4
 2024-03-31,58.1
 2024-06-30,57.8
 2024-09-30,57.2
 2025-06-30,56.3
-"""
-    with open(cofer_path, "w") as f:
-        f.write(cofer_default.strip() + "\n")
+""",
+)
 
-pe_path = "data/pe_sp500.csv"
-if not os.path.exists(pe_path):
-    pe_default = """
+auto_create(
+    "data/pe_sp500.csv",
+    """
 date,pe
 2025-11-26,30.57
-"""
-    with open(pe_path, "w") as f:
-        f.write(pe_default.strip() + "\n")
+""",
+)
 
-margin_path = "data/margin_finra.csv"
-if not os.path.exists(margin_path):
-    margin_default = """
+auto_create(
+    "data/margin_finra.csv",
+    """
 date,debit_bil
 2025-10-31,1180
-"""
-    with open(margin_path, "w") as f:
-        f.write(margin_default.strip() + "\n")
+""",
+)
 
-breadth_path = "data/spx_percent_above_200dma.csv"
-if not os.path.exists(breadth_path):
-    breadth_default = """
+auto_create(
+    "data/spx_percent_above_200dma.csv",
+    """
 date,value
 2024-12-31,68.4
 2025-01-31,72.1
@@ -60,593 +63,760 @@ date,value
 2025-09-30,52.1
 2025-10-31,45.6
 2025-11-26,16.0
-"""
-    with open(breadth_path, "w") as f:
-        f.write(breadth_default.strip() + "\n")
+""",
+)
 
-fred = Fred(api_key=st.secrets["FRED_API_KEY"])
-fmp_key = st.secrets["FMP_API_KEY"]
-av_key = st.secrets["ALPHAVANTAGE_API_KEY"]
 
-@st.cache_data(ttl=1800)
-def fetch_fmp(endpoint):
-    url = f"https://financialmodelingprep.com/api/v3/{endpoint}&apikey={fmp_key}"
-    r = requests.get(url, timeout=30)
-    if r.status_code != 200:
-        return None
+st.set_page_config(
+    page_title="ECON MIRROR — Immortal Edition",
+    layout="wide",
+    page_icon="🌍",
+    initial_sidebar_state="expanded",
+)
+
+
+FRED_API_KEY = st.secrets.get("FRED_API_KEY", "")
+FMP_API_KEY = st.secrets.get("FMP_API_KEY", "")
+ALPHAVANTAGE_API_KEY = st.secrets.get("ALPHAVANTAGE_API_KEY", "")
+
+fred = Fred(api_key=FRED_API_KEY) if FRED_API_KEY else None
+SESSION = requests.Session()
+SESSION.headers.update(
+    {
+        "User-Agent": "EconMirror/1.0",
+        "Accept": "application/json,text/html,*/*;q=0.8",
+    }
+)
+
+
+def to_float(x) -> float:
     try:
-        return r.json()
-    except:
-        return None
+        if x is None:
+            return float("nan")
+        if isinstance(x, (int, float)):
+            return float(x)
+        s = str(x).replace(",", "").replace("%", "").strip()
+        if s == "":
+            return float("nan")
+        return float(s)
+    except Exception:
+        return float("nan")
 
-@st.cache_data(ttl=1800)
-def fetch_fred(series):
-    try:
-        df = fred.get_series_all_releases(series)
-        if df is None or len(df) == 0:
-            return None
-        return df
-    except:
-        return None
 
-@st.cache_data(ttl=1800)
-def fetch_alpha_ts(symbol):
-    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey={av_key}"
-    r = requests.get(url, timeout=30)
+def load_csv(path: str) -> pd.DataFrame:
     try:
-        return r.json()
-    except:
-        return None
-def safe_read_csv(path, date_col):
-    try:
-        df = pd.read_csv(path)
-        if date_col in df.columns:
-            df[date_col] = pd.to_datetime(df[date_col], format="%Y-%m-%d", errors="coerce")
-        df = df.dropna()
-        if df.empty:
-            return None
-        return df.sort_values(date_col)
-    except:
-        return None
+        if not os.path.exists(path):
+            return pd.DataFrame()
+        return pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
 
-def mirror_latest_csv(path, time_col, value_col):
-    df = safe_read_csv(path, time_col)
-    if df is None or df.empty:
+
+def mirror_latest_csv(path: str, value_col: str, time_col: str):
+    df = load_csv(path)
+    if df.empty or value_col not in df.columns or time_col not in df.columns:
         return float("nan"), float("nan"), "Mirror empty", []
+    df[time_col] = pd.to_datetime(df[time_col], format="%Y-%m-%d", errors="coerce")
+    df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
+    df = df.dropna(subset=[time_col, value_col]).sort_values(time_col)
     if df.empty:
         return float("nan"), float("nan"), "Mirror empty", []
-    df = df.dropna().sort_values(time_col)
-    if df.empty:
-        return float("nan"), float("nan"), "Mirror empty", []
-    latest = df.iloc[-1][value_col]
-    prev = df.iloc[-2][value_col] if len(df) > 1 else float("nan")
-    return latest, prev, "OK", df.to_dict("records")
+    cur = float(df.iloc[-1][value_col])
+    prev = float(df.iloc[-2][value_col]) if len(df) > 1 else float("nan")
+    hist = df[value_col].tail(24).astype(float).tolist()
+    return cur, prev, "Mirror", hist
 
-def get_fmp_index(symbol):
-    data = fetch_fmp(f"historical-price-full/{symbol}?serietype=line")
-    if not data or "historical" not in data:
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def fred_series(series_id: str):
+    if not fred:
         return None
     try:
-        df = pd.DataFrame(data["historical"])
+        s = fred.get_series(series_id)
+        if s is None or len(s) == 0:
+            return None
+        return s
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def fmp_historical(symbol: str, days: int = 800) -> pd.DataFrame | None:
+    if not FMP_API_KEY:
+        return None
+    try:
+        url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}?timeseries={days}&apikey={FMP_API_KEY}"
+        r = SESSION.get(url, timeout=30)
+        data = r.json()
+        hist = data.get("historical", [])
+        if not hist:
+            return None
+        df = pd.DataFrame(hist)
         df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d", errors="coerce")
-        df = df.dropna()
-        df = df.sort_values("date")
+        df = df.dropna(subset=["date", "close"]).sort_values("date")
         return df
-    except:
+    except Exception:
         return None
 
-def get_fmp_quote(symbol):
-    data = fetch_fmp(f"quote/{symbol}?")
-    if not data:
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def fmp_quote(symbol: str) -> dict | None:
+    if not FMP_API_KEY:
         return None
     try:
+        url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
+        r = SESSION.get(url, timeout=30)
+        data = r.json()
+        if not data:
+            return None
         return data[0]
-    except:
+    except Exception:
         return None
 
-def get_spx_data():
-    return get_fmp_index("%5EGSPC")
 
-def get_vix_data():
-    return get_fmp_index("%5EVIX")
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_spx_history() -> pd.DataFrame | None:
+    return fmp_historical("%5EGSPC")
 
-def spx_close_latest():
-    df = get_spx_data()
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_vix_history() -> pd.DataFrame | None:
+    return fmp_historical("%5EVIX")
+
+
+def spx_last():
+    df = get_spx_history()
     if df is None or df.empty:
         return float("nan")
-    return float(df.iloc[-1]["close"])
+    return float(df["close"].iloc[-1])
 
-def spx_ath_value():
-    df = get_spx_data()
+
+def spx_ath():
+    df = get_spx_history()
     if df is None or df.empty:
         return float("nan")
     return float(df["close"].max())
 
+
 def spx_drawdown_pct():
-    c = spx_close_latest()
-    a = spx_ath_value()
+    c = spx_last()
+    a = spx_ath()
     if np.isnan(c) or np.isnan(a) or a == 0:
         return float("nan")
-    return (c / a - 1) * 100
+    return (c / a - 1.0) * 100.0
 
-def get_gold_usd():
-    q = get_fmp_quote("XAUUSD")
-    if not q:
-        return float("nan")
-    return float(q["price"])
 
-def get_oil_wti():
-    q = get_fmp_quote("WTIUSD")
-    if not q:
-        return float("nan")
-    return float(q["price"])
-
-def get_btc():
-    q = get_fmp_quote("BTCUSD")
-    if not q:
-        return float("nan")
-    return float(q["price"])
-
-def real_assets_index():
-    g = get_gold_usd()
-    o = get_oil_wti()
-    b = get_btc()
-    if np.isnan(g) or np.isnan(o) or np.isnan(b):
-        return float("nan")
-    return (g / 2000) + (o / 90) + (b / 60000)
-
-def fed_balance_yoy():
-    df = fetch_fred("WALCL")
-    if df is None:
-        return float("nan")
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        if len(s) < 53:
-            return float("nan")
-        latest = s.iloc[-1]["value"]
-        prev_yr = s.iloc[-53]["value"]
-        return (latest - prev_yr) / prev_yr * 100
-    except:
-        return float("nan")
-
-def sofr_spread():
-    df = fetch_fred("SOFR")
-    if df is None:
-        return float("nan")
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        if len(s) < 2:
-            return float("nan")
-        latest = s.iloc[-1]["value"]
-        prev = s.iloc[-2]["value"]
-        return latest - prev
-    except:
-        return float("nan")
-
-def spx_breadth():
-    latest, prev, status, hist = mirror_latest_csv("data/spx_percent_above_200dma.csv", "date", "value")
-    return latest
-def cofer_usd_share():
-    latest, prev, status, hist = mirror_latest_csv("data/imf_cofer_usd_share.csv", "date", "usd_share")
-    return latest
-
-def margin_debt():
-    latest, prev, status, hist = mirror_latest_csv("data/margin_finra.csv", "date", "debit_bil")
-    return latest
-
-def spx_pe():
-    latest, prev, status, hist = mirror_latest_csv("data/pe_sp500.csv", "date", "pe")
-    return latest
-
-def kill_1_vix_spike():
-    df = get_vix_data()
-    if df is None:
-        return 0
-    latest = df.iloc[-1]["close"]
-    prev = df.iloc[-2]["close"] if len(df) > 1 else latest
-    return 1 if latest > prev * 1.15 else 0
-
-def kill_2_spx_drawdown():
-    d = spx_drawdown_pct()
-    return 1 if not np.isnan(d) and d > -5 else 0
-
-def kill_3_spx_ytd():
-    df = get_spx_data()
+def spx_ytd_return():
+    df = get_spx_history()
     if df is None or df.empty:
-        return 0
-    this_year = df[df["date"].dt.year == datetime.now().year]
-    if this_year.empty:
-        return 0
-    start = this_year.iloc[0]["close"]
-    end = this_year.iloc[-1]["close"]
-    if start == 0:
-        return 0
-    y = (end - start) / start * 100
-    return 1 if y > 10 else 0
+        return float("nan")
+    year = datetime.utcnow().year
+    dfy = df[df["date"].dt.year == year]
+    if dfy.empty:
+        return float("nan")
+    first = float(dfy["close"].iloc[0])
+    last = float(dfy["close"].iloc[-1])
+    if first == 0:
+        return float("nan")
+    return (last / first - 1.0) * 100.0
 
-def kill_4_margin_debt_spike():
-    m = margin_debt()
-    return 1 if not np.isnan(m) and m > 1000 else 0
 
-def kill_5_hy_spread():
-    df = fetch_fred("BAMLH0A0HYM2")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest < 4 else 0
-    except:
-        return 0
+def vix_last():
+    df = get_vix_history()
+    if df is None or df.empty:
+        return float("nan")
+    return float(df["close"].iloc[-1])
 
-def kill_6_real_fed_rate():
-    ff = fetch_fred("DFF")
-    cpi = fetch_fred("CPIAUCSL")
-    if ff is None or cpi is None:
-        return 0
-    try:
-        f = ff.copy()
-        f["date"] = pd.to_datetime(f["date"], format="%Y-%m-%d", errors="coerce")
-        f = f.dropna().sort_values("date")
-        c = cpi.copy()
-        c["date"] = pd.to_datetime(c["date"], format="%Y-%m-%d", errors="coerce")
-        c = c.dropna().sort_values("date")
-        f = f.rename(columns={"value": "ff"})
-        c = c.rename(columns={"value": "cpi"})
-        merged = pd.merge_asof(f, c, on="date")
-        merged["cpi_yoy"] = merged["cpi"].pct_change(12) * 100
-        merged["real"] = merged["ff"] - merged["cpi_yoy"]
-        latest = merged.iloc[-1]["real"]
-        return 1 if latest < 1 else 0
-    except:
-        return 0
 
-def kill_7_put_call():
-    df = fetch_fred("PC_RATIO")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest < 0.9 else 0
-    except:
-        return 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def gold_usd():
+    q = fmp_quote("XAUUSD")
+    if not q:
+        cur, _, _, _ = mirror_latest_csv("data/gold_spot_usd.csv", "price", "date")
+        return float(cur)
+    return float(q.get("price", float("nan")))
 
-def kill_8_aaii():
-    df = fetch_fred("AAIIBULL")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest > 35 else 0
-    except:
-        return 0
 
-def kill_9_breadth():
-    b = spx_breadth()
-    return 1 if not np.isnan(b) and b < 25 else 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def oil_wti():
+    q = fmp_quote("WTIUSD")
+    if not q:
+        cur, _, _, _ = mirror_latest_csv("data/crude_oil_price.csv", "price", "date")
+        return float(cur)
+    return float(q.get("price", float("nan")))
 
-def kill_10_fed_balance_sofr():
-    y = fed_balance_yoy()
-    s = sofr_spread()
-    if np.isnan(y) or np.isnan(s):
-        return 0
-    return 1 if y > 5 and s > 0 else 0
-def short_term_kill_count():
-    k1 = kill_1_vix_spike()
-    k2 = kill_2_spx_drawdown()
-    k3 = kill_3_spx_ytd()
-    k4 = kill_4_margin_debt_spike()
-    k5 = kill_5_hy_spread()
-    k6 = kill_6_real_fed_rate()
-    k7 = kill_7_put_call()
-    k8 = kill_8_aaii()
-    k9 = kill_9_breadth()
-    k10 = kill_10_fed_balance_sofr()
-    return {
-        "k1": k1,
-        "k2": k2,
-        "k3": k3,
-        "k4": k4,
-        "k5": k5,
-        "k6": k6,
-        "k7": k7,
-        "k8": k8,
-        "k9": k9,
-        "k10": k10,
-        "count": k1 + k2 + k3 + k4 + k5 + k6 + k7 + k8 + k9 + k10
-    }
 
-def dark_1_real_rates():
-    ff = fetch_fred("DFF")
-    cpi = fetch_fred("CPIAUCSL")
-    if ff is None or cpi is None:
-        return 0
-    try:
-        f = ff.copy()
-        f["date"] = pd.to_datetime(f["date"], format="%Y-%m-%d", errors="coerce")
-        f = f.dropna().sort_values("date")
-        c = cpi.copy()
-        c["date"] = pd.to_datetime(c["date"], format="%Y-%m-%d", errors="coerce")
-        c = c.dropna().sort_values("date")
-        f = f.rename(columns={"value": "ff"})
-        c = c.rename(columns={"value": "cpi"})
-        merged = pd.merge_asof(f, c, on="date")
-        merged["cpi_yoy"] = merged["cpi"].pct_change(12) * 100
-        merged["real"] = merged["ff"] - merged["cpi_yoy"]
-        latest = merged.iloc[-1]["real"]
-        return 1 if latest < 1 else 0
-    except:
-        return 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def btc_usd():
+    q = fmp_quote("BTCUSD")
+    if not q:
+        cur, _, _, _ = mirror_latest_csv("data/btc_usd.csv", "price", "date")
+        return float(cur)
+    return float(q.get("price", float("nan")))
 
-def dark_2_debt_to_gdp():
-    df = fetch_fred("GFDEGDQ188S")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest > 110 else 0
-    except:
-        return 0
 
-def dark_3_wealth_gap():
-    df = fetch_fred("WFRBLB50207")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest > 2.5 else 0
-    except:
-        return 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def real_assets_index():
+    g = gold_usd()
+    o = oil_wti()
+    b = btc_usd()
+    vals = [g, o, b]
+    if any(np.isnan(v) for v in vals):
+        return float("nan")
+    norm = (g / 2000.0) + (o / 90.0) + (b / 60000.0)
+    return norm
 
-def dark_4_labor_share():
-    df = fetch_fred("LABSHPUSA156NRUG")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest < 60 else 0
-    except:
-        return 0
 
-def dark_5_productivity():
-    df = fetch_fred("OPHNFB")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest < 2 else 0
-    except:
-        return 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def hy_spread():
+    s = fred_series("BAMLH0A0HYM2")
+    if s is None or len(s) == 0:
+        cur, _, _, _ = mirror_latest_csv("data/hy_spread.csv", "spread_bps", "date")
+        return float(cur)
+    return float(s.iloc[-1])
 
-def dark_6_cb_gold_buying():
-    df = fetch_fred("GOLDAMGBD228NLBM")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest > 1800 else 0
-    except:
-        return 0
 
-def dark_7_currency_wars():
-    dxy = get_fmp_quote("DXY")
-    if not dxy:
-        return 0
-    try:
-        v = float(dxy["price"])
-        return 1 if v > 110 else 0
-    except:
-        return 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def real_fed_rate():
+    s_ff = fred_series("FEDFUNDS")
+    s_cpi = fred_series("CPIAUCSL")
+    if s_ff is None or s_cpi is None or len(s_ff) == 0 or len(s_cpi) < 13:
+        cur, _, _, _ = mirror_latest_csv("data/real_fed_rate.csv", "real_rate", "date")
+        return float(cur)
+    ff = float(s_ff.iloc[-1])
+    cpi_yoy = float(s_cpi.pct_change(12).iloc[-1] * 100.0)
+    return ff - cpi_yoy
 
-def dark_8_real_assets():
-    v = real_assets_index()
-    return 1 if not np.isnan(v) and v > 3 else 0
 
-def dark_9_cofer():
-    v = cofer_usd_share()
-    return 1 if not np.isnan(v) and v < 57 else 0
+@st.cache_data(ttl=1800, show_spinner=False)
+def put_call_ratio():
+    s = fred_series("PC_RATIO")
+    if s is None or len(s) == 0:
+        cur, _, _, _ = mirror_latest_csv("data/cboe_total_pc.csv", "total_pc", "date")
+        return float(cur)
+    return float(s.iloc[-1])
 
-def dark_10_pe():
-    p = spx_pe()
-    return 1 if not np.isnan(p) and p > 28 else 0
 
-def dark_11_credit_spread():
-    df = fetch_fred("BAMLH0A0HYM2")
-    if df is None:
-        return 0
-    try:
-        s = df[df["value"].notna()].copy()
-        s["date"] = pd.to_datetime(s["date"], format="%Y-%m-%d", errors="coerce")
-        s = s.dropna().sort_values("date")
-        latest = s.iloc[-1]["value"]
-        return 1 if latest < 4 else 0
-    except:
-        return 0
-def long_term_dark_count(reset_flag):
-    d1 = dark_1_real_rates()
-    d2 = dark_2_debt_to_gdp()
-    d3 = dark_3_wealth_gap()
-    d4 = dark_4_labor_share()
-    d5 = dark_5_productivity()
-    d6 = dark_6_cb_gold_buying()
-    d7 = dark_7_currency_wars()
-    d8 = dark_8_real_assets()
-    d9 = dark_9_cofer()
-    d10 = dark_10_pe()
-    d11 = dark_11_credit_spread()
-    dark_total = d1 + d2 + d3 + d4 + d5 + d6 + d7 + d8 + d9 + d10 + d11
-    nr1 = 1 if d6 == 1 else 0
-    nr2 = 1 if d9 == 1 else 0
-    nr3 = 1 if reset_flag else 0
-    no_return_total = nr1 + nr2 + nr3
-    return {
-        "d1": d1,
-        "d2": d2,
-        "d3": d3,
-        "d4": d4,
-        "d5": d5,
-        "d6": d6,
-        "d7": d7,
-        "d8": d8,
-        "d9": d9,
-        "d10": d10,
-        "d11": d11,
-        "dark_total": dark_total,
-        "nr1": nr1,
-        "nr2": nr2,
-        "nr3": nr3,
-        "no_return_total": no_return_total
-    }
+@st.cache_data(ttl=1800, show_spinner=False)
+def aaii_bulls():
+    s = fred_series("AAIIBULL")
+    if s is None or len(s) == 0:
+        cur, _, _, _ = mirror_latest_csv("data/aaii_bulls.csv", "bulls_pct", "date")
+        return float(cur)
+    return float(s.iloc[-1])
 
-def regime_box(kill_count, near_ath, dark_total, no_return_total):
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def spx_breadth_pct():
+    cur, _, _, _ = mirror_latest_csv(
+        "data/spx_percent_above_200dma.csv", "value", "date"
+    )
+    return float(cur)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cofer_usd_share_latest():
+    cur, prev, _, hist = mirror_latest_csv(
+        "data/imf_cofer_usd_share.csv", "usd_share", "date"
+    )
+    return float(cur), float(prev), hist
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def margin_debt_bil():
+    cur, _, _, _ = mirror_latest_csv(
+        "data/margin_finra.csv", "debit_bil", "date"
+    )
+    return float(cur)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def spx_pe_latest():
+    cur, _, _, _ = mirror_latest_csv("data/pe_sp500.csv", "pe", "date")
+    return float(cur)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def fed_balance_yoy():
+    s = fred_series("WALCL")
+    if s is None or len(s) < 53:
+        cur, _, _, _ = mirror_latest_csv(
+            "data/fed_balance_yoy.csv", "yoy_pct", "date"
+        )
+        return float(cur)
+    latest = float(s.iloc[-1])
+    prev = float(s.iloc[-53])
+    if prev == 0:
+        return float("nan")
+    return (latest / prev - 1.0) * 100.0
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def sofr_spread_bps():
+    s_sofr = fred_series("SOFR")
+    s_ff = fred_series("FEDFUNDS")
+    if s_sofr is None or s_ff is None or len(s_sofr) == 0 or len(s_ff) == 0:
+        cur, _, _, _ = mirror_latest_csv(
+            "data/sofr_spread.csv", "spread_bp", "date"
+        )
+        return float(cur)
+    sofr = float(s_sofr.iloc[-1])
+    ff = float(s_ff.iloc[-1])
+    return (sofr - ff) * 100.0
+
+
+def kill_signal_rows():
+    vix_val = vix_last()
+    dd = spx_drawdown_pct()
+    ytd = spx_ytd_return()
+    margin_bil = margin_debt_bil()
+    hy = hy_spread()
+    real_ff = real_fed_rate()
+    pc = put_call_ratio()
+    aaii_val = aaii_bulls()
+    breadth = spx_breadth_pct()
+    fed_yoy = fed_balance_yoy()
+    sofr_bp = sofr_spread_bps()
+
+    rows = []
+
+    k1 = int(vix_val < 20.0) if not np.isnan(vix_val) else 0
+    rows.append(
+        {
+            "Signal": "VIX < 20",
+            "Value": f"{vix_val:.2f}",
+            "KILL": "KILL" if k1 else "",
+        }
+    )
+
+    k2 = int(not np.isnan(dd) and dd > -8.0)
+    rows.append(
+        {
+            "Signal": "SPX within -8% of ATH",
+            "Value": f"{dd:.2f}%",
+            "KILL": "KILL" if k2 else "",
+        }
+    )
+
+    k3 = int(not np.isnan(ytd) and ytd > 10.0)
+    rows.append(
+        {
+            "Signal": "SPX YTD > 10%",
+            "Value": f"{ytd:.2f}%",
+            "KILL": "KILL" if k3 else "",
+        }
+    )
+
+    k4 = int(not np.isnan(margin_bil) and margin_bil >= 1000.0)
+    rows.append(
+        {
+            "Signal": "Margin Debt ≥ 1000B",
+            "Value": f"{margin_bil:.1f} B",
+            "KILL": "KILL" if k4 else "",
+        }
+    )
+
+    k5 = int(not np.isnan(hy) and hy < 4.0)
+    rows.append(
+        {
+            "Signal": "HY Spread < 400 bps",
+            "Value": f"{hy:.2f}",
+            "KILL": "KILL" if k5 else "",
+        }
+    )
+
+    k6 = int(not np.isnan(real_ff) and real_ff >= 1.5)
+    rows.append(
+        {
+            "Signal": "Real Fed Funds ≥ 1.5%",
+            "Value": f"{real_ff:.2f}%",
+            "KILL": "KILL" if k6 else "",
+        }
+    )
+
+    k7 = int(not np.isnan(pc) and pc < 0.7)
+    rows.append(
+        {
+            "Signal": "Put/Call < 0.70",
+            "Value": f"{pc:.3f}",
+            "KILL": "KILL" if k7 else "",
+        }
+    )
+
+    k8 = int(not np.isnan(aaii_val) and aaii_val > 45.0)
+    rows.append(
+        {
+            "Signal": "AAII Bulls > 45%",
+            "Value": f"{aaii_val:.1f}%",
+            "KILL": "KILL" if k8 else "",
+        }
+    )
+
+    k9 = int(not np.isnan(breadth) and breadth < 25.0)
+    rows.append(
+        {
+            "Signal": "% SPX above 200d < 25%",
+            "Value": f"{breadth:.1f}%",
+            "KILL": "KILL" if k9 else "",
+        }
+    )
+
+    k10 = int(
+        (not np.isnan(fed_yoy) and fed_yoy <= -5.0)
+        or (not np.isnan(sofr_bp) and sofr_bp >= 50.0)
+    )
+    rows.append(
+        {
+            "Signal": "Fed BS YoY ≤ -5% OR SOFR spread ≥ 50 bp",
+            "Value": f"{fed_yoy:.2f}% / {sofr_bp:.1f} bp",
+            "KILL": "KILL" if k10 else "",
+        }
+    )
+
+    kill_count = sum(1 for r in rows if r["KILL"] == "KILL")
+    return kill_count, rows
+
+
+def long_term_rows(reset_flag: bool):
+    total_debt = fred_series("GFDEGDQ188S")
+    debt_flag = 0
+    debt_val = float("nan")
+    if total_debt is not None and len(total_debt) > 0:
+        debt_val = float(total_debt.iloc[-1])
+        debt_flag = int(debt_val >= 110.0)
+
+    gold_val = gold_usd()
+    gold_flag = int(not np.isnan(gold_val) and gold_val >= 2500.0)
+
+    usd_share, usd_prev, _ = cofer_usd_share_latest()
+    usd_flag = int(not np.isnan(usd_share) and usd_share <= 57.0)
+
+    real_assets_val = real_assets_index()
+    real_assets_flag = int(not np.isnan(real_assets_val) and real_assets_val >= 3.0)
+
+    gini_s = fred_series("SIPOVGINIUSA")
+    gini_val = float("nan")
+    gini_flag = 0
+    if gini_s is not None and len(gini_s) > 0:
+        gini_val = float(gini_s.iloc[-1])
+        gini_flag = int(gini_val >= 0.50)
+
+    wage_s = fred_series("LABSHPUSA156NRUG")
+    wage_val = float("nan")
+    wage_flag = 0
+    if wage_s is not None and len(wage_s) > 0:
+        wage_val = float(wage_s.iloc[-1])
+        wage_flag = int(wage_val < 50.0)
+
+    prod_s = fred_series("OPHNFB")
+    prod_val = float("nan")
+    prod_flag = 0
+    if prod_s is not None and len(prod_s) > 0:
+        prod_val = float(prod_s.iloc[-1])
+        prod_flag = int(prod_val <= 0.0)
+
+    gpr_s = fred_series("GPR")
+    gpr_val = float("nan")
+    gpr_flag = 0
+    if gpr_s is not None and len(gpr_s) > 0:
+        gpr_val = float(gpr_s.iloc[-1])
+        gpr_flag = int(gpr_val >= 300.0)
+
+    pe_val = spx_pe_latest()
+    pe_flag = int(not np.isnan(pe_val) and pe_val >= 30.0)
+
+    hy_val = hy_spread()
+    hy_flag = int(not np.isnan(hy_val) and hy_val <= 4.0)
+
+    cb_gold_flag = gold_flag
+    cb_gold_desc = f"Gold spot ${gold_val:,.0f}" if not np.isnan(gold_val) else "No data"
+
+    reset_flag_int = int(bool(reset_flag))
+
+    rows = [
+        {
+            "Signal": "Total Debt / GDP high",
+            "Value": f"{debt_val:.1f}" if not np.isnan(debt_val) else "No data",
+            "Dark red?": "🔴" if debt_flag else "🟡",
+        },
+        {
+            "Signal": "Gold breaking ATH",
+            "Value": f"{gold_val:,.0f}" if not np.isnan(gold_val) else "No data",
+            "Dark red?": "🔴" if gold_flag else "🟡",
+        },
+        {
+            "Signal": "USD reserve share falling",
+            "Value": f"{usd_share:.1f}%" if not np.isnan(usd_share) else "No data",
+            "Dark red?": "🔴" if usd_flag else "🟡",
+        },
+        {
+            "Signal": "Real assets basket elevated",
+            "Value": f"{real_assets_val:.2f}" if not np.isnan(real_assets_val) else "No data",
+            "Dark red?": "🔴" if real_assets_flag else "🟡",
+        },
+        {
+            "Signal": "Gini high",
+            "Value": f"{gini_val:.3f}" if not np.isnan(gini_val) else "No data",
+            "Dark red?": "🔴" if gini_flag else "🟡",
+        },
+        {
+            "Signal": "Wage share low",
+            "Value": f"{wage_val:.1f}%" if not np.isnan(wage_val) else "No data",
+            "Dark red?": "🔴" if wage_flag else "🟡",
+        },
+        {
+            "Signal": "Productivity stagnation",
+            "Value": f"{prod_val:.2f}" if not np.isnan(prod_val) else "No data",
+            "Dark red?": "🔴" if prod_flag else "🟡",
+        },
+        {
+            "Signal": "Geopolitical risk high",
+            "Value": f"{gpr_val:.1f}" if not np.isnan(gpr_val) else "No data",
+            "Dark red?": "🔴" if gpr_flag else "🟡",
+        },
+        {
+            "Signal": "S&P P/E extreme",
+            "Value": f"{pe_val:.2f}" if not np.isnan(pe_val) else "No data",
+            "Dark red?": "🔴" if pe_flag else "🟡",
+        },
+        {
+            "Signal": "HY spreads very tight",
+            "Value": f"{hy_val:.2f}" if not np.isnan(hy_val) else "No data",
+            "Dark red?": "🔴" if hy_flag else "🟡",
+        },
+        {
+            "Signal": "Official reset / CB gold regime",
+            "Value": cb_gold_desc + (" + RESET" if reset_flag else ""),
+            "Dark red?": "🔴" if (cb_gold_flag or reset_flag_int) else "🟡",
+        },
+    ]
+
+    flags = [
+        debt_flag,
+        gold_flag,
+        usd_flag,
+        real_assets_flag,
+        gini_flag,
+        wage_flag,
+        prod_flag,
+        gpr_flag,
+        pe_flag,
+        hy_flag,
+        int(cb_gold_flag or reset_flag_int),
+    ]
+    dark_count = sum(flags)
+
+    no_return_flags = [
+        int(cb_gold_flag),
+        int(usd_flag),
+        reset_flag_int,
+    ]
+    no_return_count = sum(no_return_flags)
+
+    return dark_count, no_return_count, rows
+
+
+def get_reset_flag() -> bool:
+    return bool(st.session_state.get("official_reset_flag", False))
+
+
+def set_reset_flag(value: bool) -> None:
+    st.session_state["official_reset_flag"] = bool(value)
+
+
+def regime_summary(kill_count: int, near_ath: bool, dark_count: int, no_return_count: int) -> str:
     if kill_count >= 7 and near_ath:
-        return "FINAL TOP: SELL 80–90% THIS WEEK"
-    if dark_total >= 8 and no_return_total >= 2:
-        return "POINT OF NO RETURN: 80–100% HARD ASSETS FOREVER"
-    return "NEUTRAL"
+        return "FINAL TOP → 7+ short-term kill signals while SPX is within −8% of ATH: sell 80–90% of equities over days/weeks."
+    if dark_count >= 8 and no_return_count >= 2:
+        return "POINT OF NO RETURN → 8+ long-term dark-red + 2+ no-return triggers: tilt 80–100% into hard assets for 5–15 years."
+    if kill_count >= 4 and near_ath:
+        return "LATE-STAGE MELT-UP → multiple kill signals on while price is near ATH."
+    if dark_count >= 5:
+        return "LATE SUPER-CYCLE → many structural lights flashing, but reset not yet locked in."
+    return "MID-CYCLE → mixed signals, no extreme cluster yet."
 
-def compute_regime(reset_flag):
-    st_kills = short_term_kill_count()
-    kill_total = st_kills["count"]
-    close = spx_close_latest()
-    ath = spx_ath_value()
+
+def render_banner(kill_count: int, dark_count: int, no_return_count: int):
+    spx = spx_last()
+    dd = spx_drawdown_pct()
+    ath = spx_ath()
     near_ath = False
-    if not np.isnan(close) and not np.isnan(ath) and ath > 0:
-        if close > ath * 0.92:
-            near_ath = True
-    lt_dark = long_term_dark_count(reset_flag)
-    dark_total = lt_dark["dark_total"]
-    no_return_total = lt_dark["no_return_total"]
-    box = regime_box(kill_total, near_ath, dark_total, no_return_total)
-    return kill_total, dark_total, no_return_total, box
-def top_banner(kill_total, dark_total):
-    c1, c2 = st.columns([1, 1])
-    with c1:
+    if not np.isnan(spx) and not np.isnan(ath) and ath > 0:
+        near_ath = spx >= ath * 0.92
+
+    summary = regime_summary(kill_count, near_ath, dark_count, no_return_count)
+
+    top_html = f"""
+<div style="background:#111111;border-radius:14px;padding:18px 22px;border:1px solid #333333;margin-bottom:18px;">
+  <div style="font-size:20px;font-weight:700;color:#ffffff;margin-bottom:4px;">
+    CURRENT REGIME:
+  </div>
+  <div style="font-size:16px;color:#dddddd;margin-bottom:4px;">
+    <span style="color:#ff6666;font-weight:700;">{kill_count}/10</span> short-term kill •
+    <span style="color:#ff9966;font-weight:700;">{dark_count}/11</span> long-term dark-red •
+    <span style="color:#ffcc66;font-weight:700;">{no_return_count}/3</span> no-return
+  </div>
+  <div style="font-size:14px;color:#bbbbbb;margin-bottom:6px;">
+    SPX: {spx:,.0f} &nbsp;|&nbsp; Drawdown: {dd:.2f}% &nbsp;|&nbsp; ATH: {ath:,.0f}
+  </div>
+  <div style="font-size:14px;color:#ffffff;">
+    {summary}
+  </div>
+</div>
+"""
+    st.markdown(top_html, unsafe_allow_html=True)
+
+    if kill_count >= 7 and near_ath:
         st.markdown(
-            f"<div style='background:#111;padding:20px;border-radius:10px;font-size:28px;color:white;text-align:center;'>CURRENT REGIME<br>{kill_total}/10 short-term kill • {dark_total}/11 long-term dark-red</div>",
-            unsafe_allow_html=True
-        )
-    with c2:
-        spx = spx_close_latest()
-        dd = spx_drawdown_pct()
-        ath = spx_ath_value()
-        t = f"SPX: {spx:.2f} | Drawdown: {dd:.2f}% | ATH: {ath:.2f}"
-        st.markdown(
-            f"<div style='background:#111;padding:20px;border-radius:10px;font-size:22px;color:white;text-align:center;'>{t}</div>",
-            unsafe_allow_html=True
+            """
+<div style="background:#290000;border:2px solid #ff4444;border-radius:12px;padding:16px;margin-bottom:12px;color:#ffcccc;font-weight:700;text-align:center;">
+FINAL TOP ZONE: 7+ short-term kill signals while SPX is near ATH → I plan to sell 80–90% of equity risk this week.
+</div>
+""",
+            unsafe_allow_html=True,
         )
 
-def core_tab():
-    c1, c2, c3 = st.columns(3)
-    spx = spx_close_latest()
-    vix_df = get_vix_data()
-    vix = vix_df.iloc[-1]["close"] if vix_df is not None and not vix_df.empty else float("nan")
-    gold = get_gold_usd()
-    oil = get_oil_wti()
-    btc = get_btc()
-    pe = spx_pe()
-    margin = margin_debt()
-    cofer = cofer_usd_share()
-    breadth = spx_breadth()
+    if dark_count >= 8 and no_return_count >= 2:
+        st.markdown(
+            """
+<div style="background:#261300;border:2px solid #ff9900;border-radius:12px;padding:16px;margin-bottom:12px;color:#ffe6cc;font-weight:700;text-align:center;">
+POINT OF NO RETURN: 8+ long-term dark-red + 2+ no-return triggers → I tilt 80–100% of long-horizon capital into hard assets for 5–15 years.
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+
+def render_core_tab():
+    spx = spx_last()
+    dd = spx_drawdown_pct()
+    ytd = spx_ytd_return()
+    vix_val = vix_last()
+    gold_val = gold_usd()
+    oil_val = oil_wti()
+    btc_val = btc_usd()
+    pe_val = spx_pe_latest()
+    margin_val = margin_debt_bil()
+    breadth_val = spx_breadth_pct()
+    hy_val = hy_spread()
+    real_ff = real_fed_rate()
+    usd_share_val, usd_prev_val, _ = cofer_usd_share_latest()
+    real_assets_val = real_assets_index()
+
+    c1, c2, c3, c4 = st.columns(4)
+
     with c1:
-        st.metric("S&P 500", f"{spx:.2f}")
-        st.metric("VIX", f"{vix:.2f}")
-        st.metric("Breadth <200DMA%", f"{breadth:.2f}")
+        st.metric("S&P 500", f"{spx:,.0f}")
+        st.metric("Drawdown from ATH", f"{dd:.2f}%")
+        st.metric("YTD Return", f"{ytd:.2f}%")
+
     with c2:
-        st.metric("Gold (USD)", f"{gold:.2f}")
-        st.metric("Oil WTI", f"{oil:.2f}")
-        st.metric("BTC", f"{btc:.2f}")
+        st.metric("VIX Index", f"{vix_val:.2f}")
+        st.metric("HY Spread (approx)", f"{hy_val:.2f}")
+        st.metric("Real Fed Funds", f"{real_ff:.2f}%")
+
     with c3:
-        st.metric("S&P PE", f"{pe:.2f}")
-        st.metric("Margin Debt (B)", f"{margin:.2f}")
-        st.metric("COFER USD%", f"{cofer:.2f}")
+        st.metric("Gold Spot (USD/oz)", f"{gold_val:,.0f}")
+        st.metric("Oil WTI", f"{oil_val:.2f}")
+        st.metric("BTCUSD", f"{btc_val:,.0f}")
 
-def short_term_tab():
-    k = short_term_kill_count()
-    df = pd.DataFrame([
-        ["1. VIX Spike", k["k1"]],
-        ["2. SPX Drawdown", k["k2"]],
-        ["3. SPX YTD", k["k3"]],
-        ["4. Margin Debt Spike", k["k4"]],
-        ["5. HY Spread", k["k5"]],
-        ["6. Real Fed Rate", k["k6"]],
-        ["7. Put/Call", k["k7"]],
-        ["8. AAII Bulls", k["k8"]],
-        ["9. Breadth Collapse", k["k9"]],
-        ["10. Fed Balance + SOFR", k["k10"]],
-    ], columns=["Indicator", "Signal"])
-    st.dataframe(df, use_container_width=True)
-    st.markdown(f"### Total: {k['count']}/10")
+    with c4:
+        st.metric("S&P 500 P/E", f"{pe_val:.2f}")
+        st.metric("Margin Debt (B)", f"{margin_val:.1f}")
+        st.metric(
+            "USD Reserve Share",
+            f"{usd_share_val:.1f}%" if not np.isnan(usd_share_val) else "No data",
+        )
 
-def long_term_tab(reset_flag):
-    d = long_term_dark_count(reset_flag)
-    df = pd.DataFrame([
-        ["1. Real Rates <1%", d["d1"]],
-        ["2. Debt/GDP >110%", d["d2"]],
-        ["3. Wealth Gap", d["d3"]],
-        ["4. Labor Share <60", d["d4"]],
-        ["5. Productivity Weak", d["d5"]],
-        ["6. CB Gold Buying", d["d6"]],
-        ["7. Currency Wars", d["d7"]],
-        ["8. Real Assets Index", d["d8"]],
-        ["9. COFER Collapse", d["d9"]],
-        ["10. PE >28", d["d10"]],
-        ["11. Credit Spread <4", d["d11"]],
-    ], columns=["Indicator", "Dark Red"])
-    st.dataframe(df, use_container_width=True)
-    st.markdown(f"### Dark Red: {d['dark_total']}/11")
-    st.markdown(f"### No-Return: {d['no_return_total']}/3")
-st.set_page_config(page_title="Econ Mirror", layout="wide")
+    st.markdown("---")
 
-if not os.path.exists("data"):
-    os.makedirs("data", exist_ok=True)
+    tbl_rows = [
+        ["SPX", f"{spx:,.0f}", "Index level", "FMP ^GSPC"],
+        ["SPX Drawdown %", f"{dd:.2f}%", "From ATH", "FMP ^GSPC"],
+        ["SPX YTD %", f"{ytd:.2f}%", "This calendar year", "FMP ^GSPC"],
+        ["VIX", f"{vix_val:.2f}", "Volatility", "FMP ^VIX"],
+        ["HY Spread", f"{hy_val:.2f}", "Approx OAS", "FRED BAMLH0A0HYM2"],
+        ["Real Fed Funds", f"{real_ff:.2f}%", "FEDFUNDS − CPI YoY", "FRED"],
+        ["Gold (USD/oz)", f"{gold_val:,.0f}", "Spot", "FMP XAUUSD"],
+        ["Oil WTI", f"{oil_val:.2f}", "Spot", "FMP WTIUSD"],
+        ["BTCUSD", f"{btc_val:,.0f}", "Spot", "FMP BTCUSD"],
+        ["SPX P/E", f"{pe_val:.2f}", "Trailing PE", "Mirror pe_sp500.csv"],
+        ["Margin Debt", f"{margin_val:.1f} B", "FINRA debit bal", "Mirror margin_finra.csv"],
+        [
+            "USD Reserve Share",
+            f"{usd_share_val:.1f}%",
+            "IMF COFER",
+            "Mirror imf_cofer_usd_share.csv",
+        ],
+        [
+            "% SPX above 200d",
+            f"{breadth_val:.1f}%",
+            "Breadth",
+            "Mirror spx_percent_above_200dma.csv",
+        ],
+        [
+            "Real Assets Index",
+            f"{real_assets_val:.2f}" if not np.isnan(real_assets_val) else "No data",
+            "Gold/Oil/BTC basket",
+            "FMP + mirror",
+        ],
+    ]
 
-auto_create("data/imf_cofer_usd_share.csv", "date,usd_share\n2023-12-31,58.4\n2024-03-31,58.1\n2024-06-30,57.8\n2024-09-30,57.2\n2025-06-30,56.3")
-auto_create("data/pe_sp500.csv", "date,pe\n2025-11-26,30.57")
-auto_create("data/margin_finra.csv", "date,debit_bil\n2025-10-31,1180")
-auto_create("data/spx_percent_above_200dma.csv",
-            "date,value\n2024-12-31,68.4\n2025-01-31,72.1\n2025-02-28,78.9\n2025-03-31,81.2\n2025-04-30,79.5\n2025-05-31,74.3\n2025-06-30,69.8\n2025-07-31,65.2\n2025-08-31,58.7\n2025-09-30,52.1\n2025-10-31,45.6\n2025-11-26,16.0")
+    core_df = pd.DataFrame(
+        tbl_rows, columns=["Indicator", "Current", "Notes", "Source"]
+    )
+    st.dataframe(core_df, use_container_width=True, hide_index=True)
 
-k = short_term_kill_count()
-d = long_term_dark_count(get_reset_flag())
 
-top_banner(k["count"], d["dark_total"])
+def render_short_term_tab():
+    kill_count, rows = kill_signal_rows()
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.markdown(f"**Kill combo active:** {kill_count}/10")
 
-tab1, tab2, tab3 = st.tabs(["Core Mirror", "Short-Term Combo", "Long-Term Supercycle"])
 
-with tab1:
-    core_tab()
+def render_long_term_tab():
+    current_flag = get_reset_flag()
+    new_flag = st.checkbox(
+        "Mark OFFICIAL RESET / SYSTEMIC CURRENCY RESET as ON",
+        value=current_flag,
+        help="Manual override when there is an explicit law/treaty/announcement of a currency or debt system reset.",
+    )
+    if new_flag != current_flag:
+        set_reset_flag(new_flag)
+    dark_count, no_return_count, rows = long_term_rows(get_reset_flag())
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.markdown(
+        f"**Dark red signals:** {dark_count}/11 &nbsp;&nbsp; | &nbsp;&nbsp; **No-return triggers:** {no_return_count}/3",
+        unsafe_allow_html=True,
+    )
 
-with tab2:
-    short_term_tab()
 
-with tab3:
-    long_term_tab(get_reset_flag())
-st.caption("Econ Mirror — Immortal Edition")
+st.markdown(
+    "<h1 style='text-align:center;font-size:40px;'>ECON MIRROR — Immortal Edition</h1>",
+    unsafe_allow_html=True,
+)
+
+reset_flag = get_reset_flag()
+kill_count, kill_rows = kill_signal_rows()
+dark_count, no_return_count, _rows_long = long_term_rows(reset_flag)
+
+render_banner(kill_count, dark_count, no_return_count)
+
+tab_core, tab_short, tab_long = st.tabs(
+    ["Core Mirror", "Short-Term Kill Combo", "Long-Term Super-Cycle"]
+)
+
+with tab_core:
+    render_core_tab()
+
+with tab_short:
+    render_short_term_tab()
+
+with tab_long:
+    render_long_term_tab()
+
+st.caption(
+    "Econ Mirror — short-term kill combo + long-term super-cycle map, wired to official data and mirrored CSVs."
+)
