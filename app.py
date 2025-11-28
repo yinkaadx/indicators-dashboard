@@ -29,10 +29,12 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(WB_DIR, exist_ok=True)
 os.makedirs(FRED_DIR, exist_ok=True)
 
+
 def ensure_file(path: str, content: str) -> None:
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
             f.write(content.strip() + "\n")
+
 
 ensure_file(
     os.path.join(DATA_DIR, "margin_finra.csv"),
@@ -324,6 +326,19 @@ THRESHOLDS: Dict[str, str] = {
     "Productivity growth": "> 3% YoY (rising)",
     "Debt-to-GDP": "< 60% (low)",
     "Foreign reserves": "+10% YoY (increasing)",
+    "Inflation": "2–3% (moderate)",
+    "Retail sales": "+3–5% YoY (rising)",
+    "Nonfarm payrolls": "+150K/month (steady)",
+    "Wage growth": "> 3% YoY (rising)",
+    "P/E ratios": "20+ (high)",
+    "Credit growth": "> 5% YoY (increasing)",
+    "Fed funds futures": "Hikes implied +0.5%+",
+    "Short rates": "Rising (tightening)",
+    "Industrial production": "+2–5% YoY (increasing)",
+    "Consumer/investment spending": "Positive growth (high)",
+    "Productivity growth": "> 3% YoY (rising)",
+    "Debt-to-GDP": "< 60% (low)",
+    "Foreign reserves": "+10% YoY (increasing)",
     "Real rates": "< −1% (falling)",
     "Trade balance": "Surplus > 2% of GDP (improving)",
     "Asset prices > traditional metrics": "P/E +20% (high vs. fundamentals)",
@@ -468,14 +483,17 @@ def to_float(x: object) -> float:
     except Exception:
         return float("nan")
 
+
 def is_seed(path: str) -> bool:
     return os.path.exists(path + ".SEED")
+
 
 def load_csv(path: str) -> pd.DataFrame:
     try:
         return pd.read_csv(path)
     except Exception:
         return pd.DataFrame()
+
 
 @st.cache_data(ttl=1800)
 def load_fred_mirror_series(series_id: str) -> pd.Series:
@@ -499,6 +517,7 @@ def load_fred_mirror_series(series_id: str) -> pd.Series:
     s.index = pd.to_datetime(s.index)
     return s
 
+
 def fred_series(series_id: str) -> pd.Series:
     s = load_fred_mirror_series(series_id)
     if not s.empty:
@@ -507,6 +526,7 @@ def fred_series(series_id: str) -> pd.Series:
     s2 = pd.Series(raw).dropna()
     s2.index = pd.to_datetime(s2.index)
     return s2
+
 
 def yoy_from_series(s: pd.Series) -> Tuple[float, float]:
     if s.empty:
@@ -528,6 +548,7 @@ def yoy_from_series(s: pd.Series) -> Tuple[float, float]:
             prev_yoy = (last2 / base2 - 1.0) * 100.0
     return float(current_yoy), (float("nan") if pd.isna(prev_yoy) else float(prev_yoy))
 
+
 def fred_last_two(series_id: str, mode: str = "level") -> Tuple[float, float]:
     s = fred_series(series_id)
     if mode == "yoy":
@@ -538,6 +559,7 @@ def fred_last_two(series_id: str, mode: str = "level") -> Tuple[float, float]:
     cur = to_float(s.iloc[-1])
     prv = to_float(s.iloc[-2]) if len(s) > 1 else float("nan")
     return cur, prv
+
 
 def fred_history(series_id: str, mode: str = "level", n: int = 24) -> List[float]:
     s = fred_series(series_id)
@@ -559,6 +581,7 @@ def fred_history(series_id: str, mode: str = "level", n: int = 24) -> List[float
         vals = [v for v in vals if v is not None]
         return vals[-n:]
     return pd.to_numeric(s.tail(n).values, errors="coerce").astype(float).tolist()
+
 
 def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]]:
     mpath = os.path.join(WB_DIR, f"{country}_{code}.csv")
@@ -585,6 +608,7 @@ def wb_last_two(code: str, country: str) -> Tuple[float, float, str, List[float]
     except Exception:
         return float("nan"), float("nan"), "—", []
     return cur, prev, "WB (online)", hist
+
 
 def wb_share_series(code: str) -> Tuple[pd.DataFrame, str]:
     us = load_csv(os.path.join(WB_DIR, f"USA_{code}.csv"))
@@ -619,6 +643,7 @@ def wb_share_series(code: str) -> Tuple[pd.DataFrame, str]:
     except Exception:
         return pd.DataFrame(), "—"
 
+
 def mirror_latest_csv(
     path: str,
     value_col: str,
@@ -641,13 +666,16 @@ def mirror_latest_csv(
     hist = pd.to_numeric(df[value_col], errors="coerce").tail(24).astype(float).tolist()
     return cur, prev, src, hist
 
+
 def cofer_usd_share_latest() -> Tuple[float, float, str, List[float]]:
     path = os.path.join(DATA_DIR, "imf_cofer_usd_share.csv")
     return mirror_latest_csv(path, "usd_share", "date", numeric_time=False)
 
+
 def sp500_pe_latest() -> Tuple[float, float, str, List[float]]:
     path = os.path.join(DATA_DIR, "pe_sp500.csv")
     return mirror_latest_csv(path, "pe", "date", numeric_time=False)
+
 
 def parse_simple_threshold(txt: object) -> Tuple[Optional[str], Optional[float]]:
     if not isinstance(txt, str):
@@ -659,12 +687,14 @@ def parse_simple_threshold(txt: object) -> Tuple[Optional[str], Optional[float]]
     num = float(m.group(2))
     return comp, num
 
+
 def evaluate_signal(current: float, threshold_text: str) -> Tuple[str, str]:
     comp, val = parse_simple_threshold(threshold_text)
     if comp is None or val is None or pd.isna(current):
         return "—", ""
     ok = (current > val) if ">" in comp else (current < val)
     return ("✅", "ok") if ok else ("⚠️", "warn")
+
 
 # =============================================================================
 # LIVE DATA HELPERS (OFFICIAL SERIES)
@@ -689,6 +719,7 @@ def live_margin_gdp_from_mirrors() -> Tuple[float, float]:
     prev_pct = to_float(prev_m["debit_bil"]) / (to_float(prev_g["gdp_trillions"]) * 1000.0) * 100.0
     return round(cur_pct, 2), round(prev_pct, 2)
 
+
 @st.cache_data(ttl=1800)
 def live_put_call_from_mirror() -> float:
     df = load_csv(os.path.join(DATA_DIR, "cboe_putcall.csv"))
@@ -699,6 +730,7 @@ def live_put_call_from_mirror() -> float:
     if df.empty:
         return float("nan")
     return round(to_float(df.iloc[-1]["pc_ratio"]), 3)
+
 
 @st.cache_data(ttl=1800)
 def live_aaii_bulls_from_mirror() -> float:
@@ -711,6 +743,7 @@ def live_aaii_bulls_from_mirror() -> float:
         return float("nan")
     return round(to_float(df.iloc[-1]["bull"]), 1)
 
+
 @st.cache_data(ttl=1800)
 def live_insider_buy_ratio_from_mirror() -> float:
     df = load_csv(os.path.join(DATA_DIR, "insider_ratio.csv"))
@@ -722,6 +755,7 @@ def live_insider_buy_ratio_from_mirror() -> float:
         return float("nan")
     return round(to_float(df.iloc[-1]["buy_ratio_pct"]), 1)
 
+
 @st.cache_data(ttl=1800)
 def live_sp500_pe_official() -> float:
     try:
@@ -731,6 +765,7 @@ def live_sp500_pe_official() -> float:
     except Exception:
         c, _, _, _ = sp500_pe_latest()
         return float(c) if not pd.isna(c) else float("nan")
+
 
 @st.cache_data(ttl=1800)
 def live_gold_price_usd() -> float:
@@ -753,6 +788,7 @@ def live_gold_price_usd() -> float:
         oz_per_1000 = to_float(df.iloc[-1]["oz_per_1000"])
         return round(1000.0 / oz_per_1000, 2) if oz_per_1000 > 0 else float("nan")
 
+
 @st.cache_data(ttl=1800)
 def live_vix_level() -> float:
     try:
@@ -761,6 +797,7 @@ def live_vix_level() -> float:
         return round(float(j[0]["price"]), 2)
     except Exception:
         return float("nan")
+
 
 @st.cache_data(ttl=1800)
 def live_spx_price_and_drawdown() -> Tuple[float, float, float]:
@@ -789,6 +826,7 @@ def live_spx_price_and_drawdown() -> Tuple[float, float, float]:
         dd = (last / ath - 1.0) * 100.0
         return round(last, 2), round(ath, 2), round(dd, 2)
 
+
 @st.cache_data(ttl=1800)
 def live_hy_spread_bps() -> Tuple[float, bool]:
     cur, prev = fred_last_two("BAMLH0A0HYM2", mode="level")
@@ -796,6 +834,7 @@ def live_hy_spread_bps() -> Tuple[float, bool]:
         return float("nan"), False
     widening = not pd.isna(prev) and cur > prev
     return round(cur, 1), widening
+
 
 @st.cache_data(ttl=1800)
 def live_real_30y_yield() -> float:
@@ -806,6 +845,7 @@ def live_real_30y_yield() -> float:
     except Exception:
         return float("nan")
 
+
 @st.cache_data(ttl=1800)
 def live_real_fed_rate() -> float:
     try:
@@ -814,6 +854,7 @@ def live_real_fed_rate() -> float:
         return round(float(ff - cpi), 2)
     except Exception:
         return float("nan")
+
 
 @st.cache_data(ttl=1800)
 def live_liquidity_metrics() -> Tuple[float, float]:
@@ -835,6 +876,7 @@ def live_liquidity_metrics() -> Tuple[float, float]:
         soff_spread = float("nan")
     return float(bs_yoy), float(soff_spread)
 
+
 @st.cache_data(ttl=1800)
 def long_total_debt_gdp() -> float:
     df = load_csv(os.path.join(DATA_DIR, "total_debt_gdp.csv"))
@@ -845,6 +887,7 @@ def long_total_debt_gdp() -> float:
     if df.empty:
         return float("nan")
     return round(to_float(df.iloc[-1]["total_debt_gdp_pct"]), 1)
+
 
 @st.cache_data(ttl=1800)
 def long_gpr_value() -> float:
@@ -857,10 +900,12 @@ def long_gpr_value() -> float:
         return float("nan")
     return round(to_float(df.iloc[-1]["gpr"]), 1)
 
+
 @st.cache_data(ttl=1800)
 def long_gini_value() -> float:
     val, _ = fred_last_two("SIPOVGINIUSA", mode="level")
     return round(val, 3) if not pd.isna(val) else float("nan")
+
 
 @st.cache_data(ttl=1800)
 def long_wage_share_pct() -> float:
@@ -870,6 +915,7 @@ def long_wage_share_pct() -> float:
     if val <= 1:
         val *= 100.0
     return round(val, 1)
+
 
 @st.cache_data(ttl=1800)
 def long_productivity_cagr_5y() -> float:
@@ -885,6 +931,7 @@ def long_productivity_cagr_5y() -> float:
     years = 5.0
     cagr = (last / base) ** (1.0 / years) - 1.0
     return round(cagr * 100.0, 2)
+
 
 @st.cache_data(ttl=1800)
 def long_usd_reserve_yoy_pp() -> float:
@@ -903,6 +950,7 @@ def long_usd_reserve_yoy_pp() -> float:
     base = float(one_year_ago.iloc[-1]["usd_share"])
     return round(last - base, 2)
 
+
 @st.cache_data(ttl=1800)
 def long_real_assets_basket_24m() -> float:
     df = load_csv(os.path.join(DATA_DIR, "real_assets_basket.csv"))
@@ -919,9 +967,11 @@ def long_real_assets_basket_24m() -> float:
     ret = (last / base - 1.0) * 100.0
     return round(ret, 1)
 
+
 @st.cache_data(ttl=1800)
 def long_real_30y_extreme() -> float:
     return live_real_30y_yield()
+
 
 @st.cache_data(ttl=1800)
 def long_usd_gold_power_oz_per_1000() -> float:
@@ -936,6 +986,7 @@ def long_usd_gold_power_oz_per_1000() -> float:
             return float("nan")
         return float(df.iloc[-1]["oz_per_1000"])
     return round(1000.0 / price, 3)
+
 
 @st.cache_data(ttl=1800)
 def long_gold_ath_vs_ccy_status() -> Tuple[str, int]:
@@ -953,14 +1004,15 @@ def long_gold_ath_vs_ccy_status() -> Tuple[str, int]:
                 hits += 1
     except Exception:
         pass
-    # Other currencies can be added with extra AV calls if needed
     if total == 0:
         return "No data", 0
     return f"{hits}/{total} majors near ATH", hits
 
+
 @st.cache_data(ttl=1800)
 def long_gdp_debt_stack() -> float:
     return long_total_debt_gdp()
+
 
 # =============================================================================
 # CORE LIVE VALUES SHARED
@@ -977,6 +1029,10 @@ real_fed_live = live_real_fed_rate()
 bs_yoy, sofr_spread = live_liquidity_metrics()
 spx_last, spx_ath, spx_drawdown = live_spx_price_and_drawdown()
 usd_gold_power = long_usd_gold_power_oz_per_1000()
+
+# Initialize for safety
+dark_count: int = 0
+no_return_count: int = 0
 
 # =============================================================================
 # CORE TAB (50+ INDICATORS)
@@ -1303,6 +1359,7 @@ def build_short_term_table() -> Tuple[pd.DataFrame, int]:
     kill_count = int((df["Status"] == "KILL").sum())
     return df, kill_count
 
+
 short_df, kill_count = build_short_term_table()
 
 # =============================================================================
@@ -1395,11 +1452,11 @@ def build_long_term_table() -> Tuple[pd.DataFrame, int, int]:
     )
 
     # 6 Gini
-    if pd.isna(long_gini_value()):
+    gini_val = long_gini_value()
+    if pd.isna(gini_val):
         status6 = "NO DATA"
         gini_str = "No data"
     else:
-        gini_val = long_gini_value()
         status6 = "DARK RED" if gini_val > 0.5 else "WATCH" if gini_val > 0.4 else "OK"
         gini_str = f"{gini_val:.3f}"
     rows.append(
@@ -1532,47 +1589,57 @@ def build_long_term_table() -> Tuple[pd.DataFrame, int, int]:
     dark_count = int((df["Status"] == "DARK RED").sum())
     return df, dark_count, no_return_count
 
+
+# =============================================================================
+# LONG-TERM TAB RENDER
+# =============================================================================
 with tab_long:
-    # NEW LONG-TERM RULE LOGIC + BOX
+    long_df, dark_count, no_return_count = build_long_term_table()
+
     st.markdown(
         """
-        **New Unbreakable Timing Rules**
+        **New Unbreakable Timing Rules for**
 
         **Short-term — When to time the burst ahead (sell 80–90%)**  
-        You now wait for **7-out-of-10 kill signals** while **S&P is still within –8% of ATH (or green YTD).**
+        You now wait for **7-out-of-10 kill signals** while the **S&P is still within –8% of its all-time high (or green YTD)**.
 
-        **Long-term — When the super-cycle really ends (go 80–100% hard assets forever)**  
-        You now wait for **8+ dark-red** AND **at least two of the three no-return triggers**  
-        (reserve share collapse + real assets explosion + official reset event).
+        **Long-term — When the super-cycle really ends (go 80–100% hard assets “forever”)**  
+        You now wait for **8+ dark-red super-cycle signals** **AND at least two of the three no-return triggers**  
+        (**reserve share collapse + real assets explosion + official reset event**).
         """
     )
 
-    if dark_red_count >= 8 and no_return_count >= 2:
+    if dark_count >= 8 and no_return_count >= 2:
         reset_box_html = """
         <div style="background:#8b0000; color:white; padding:20px; border-radius:12px; font-size:2rem; text-align:center">
         8+ DARK-RED SUPER-CYCLE SIGNALS + 2 NO-RETURN TRIGGERS<br/>
         (RESERVE SHARE COLLAPSE · REAL ASSETS EXPLOSION · OFFICIAL RESET EVENT)<br/>
-        → RULE: 80–100% GOLD/BITCOIN/CASH/HARD ASSETS FOR 5–15 YEARS
+        → RULE: 80–100% GOLD/BITCOIN/CASH/HARD ASSETS FOR A FULL SUPER-CYCLE (5–15+ YEARS)
         </div>
         """
         st.markdown(reset_box_html, unsafe_allow_html=True)
 
+    st.dataframe(
+        long_df[
+            ["#", "Signal", "Value", "Dark Red Threshold", "Status", "Why this matters"]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 # =============================================================================
 # SHORT-TERM TAB RENDER
 # =============================================================================
 with tab_short:
-    # NEW SHORT-TERM RULE LOGIC + BOX
     st.markdown(
         """
-        **New Unbreakable Timing Rules**
+        **New Unbreakable Timing Rules for**
 
         **Short-term — When to time the burst ahead (sell 80–90%)**  
-        You now wait for **7-out-of-10 kill signals** while **S&P is still within –8% of ATH (or green YTD).**
+        You now wait for **7-out-of-10 kill signals** while the **S&P is still within –8% of ATH (or green YTD)**.  
 
-        **Long-term — When the super-cycle really ends (go 80–100% hard assets forever)**  
-        You now wait for **8+ dark-red** AND **at least two of the three no-return triggers**  
-        (reserve share collapse + real assets explosion + official reset event).
+        At that point, the rule is:  
+        **→ Sell 80–90% of your stock exposure and move into cash/gold/Bitcoin/defensives.**
         """
     )
 
@@ -1585,6 +1652,12 @@ with tab_short:
         """
         st.markdown(kill_box_html, unsafe_allow_html=True)
 
+    st.dataframe(
+        short_df[["#", "Signal", "Value", "Threshold", "Status", "Why this matters"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+
 # =============================================================================
 # GLOBAL REGIME BANNER
 # =============================================================================
@@ -1592,12 +1665,14 @@ regime_text = (
     "Current regime: Late-stage melt-up (short-term) inside late-stage debt super-cycle (long-term). "
     "Ride stocks with 20–30% cash + 30–40% gold/BTC permanent."
 )
+
 spx_info = (
     f"SPX: {spx_last:,.2f} | Drawdown: {spx_drawdown:.2f}% | ATH: {spx_ath:,.2f} | "
     f"Kill: {kill_count}/10 | Dark: {dark_count}/11 | No-return: {no_return_count}/3"
     if not pd.isna(spx_last)
     else "SPX data unavailable."
 )
+
 st.markdown(f"<div class='kill-box'>{regime_text} {spx_info}</div>", unsafe_allow_html=True)
 
 st.caption(
