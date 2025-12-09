@@ -40,40 +40,63 @@ def fmt(val, unit="%"):
     if val is None: return "-"
     return f"{val:,.2f}{unit}" if unit else f"{val:,.2f}"
 
-# --- INDICATOR MAP (CORE) ---
+# --- INDICATOR MAP (FULL 50+ LIST) ---
 CORE_MAP = [
-    {"name": "Yield curve", "id": "T10Y2Y", "seed": "T10Y2Y", "unit": "%", "rule": "> 1", "why": "Inversion leads to recession."},
-    {"name": "Consumer confidence", "id": "UMCSENT", "seed": "UMCSENT", "unit": "Idx", "rule": "> 90", "why": "70% of GDP is consumption."},
-    {"name": "Building permits", "id": "PERMIT", "seed": "PERMIT", "unit": "k", "rule": "yoy > 5", "trans": "yoy", "why": "Housing leads the cycle."},
-    {"name": "Unemployment claims", "id": "ICSA", "seed": "ICSA", "unit": "k", "rule": "yoy < -10", "trans": "yoy", "why": "First labor crack."},
-    {"name": "LEI", "id": "USSLIND", "seed": "USSLIND", "unit": "Idx", "rule": "yoy > 1", "trans": "yoy", "why": "Leading index."},
-    {"name": "GDP", "id": "A191RL1Q225SBEA", "seed": "GDP", "unit": "%", "rule": "> 2", "why": "Output growth."},
-    {"name": "Capacity utilization", "id": "TCU", "seed": "TCU", "unit": "%", "rule": "> 80", "why": "Factory slack."},
-    {"name": "Inflation", "id": "CPIAUCSL", "seed": "CPIAUCSL", "unit": "%", "rule": "range 2 3", "trans": "yoy", "why": "Purchasing power."},
-    {"name": "Retail sales", "id": "RSXFS", "seed": "RSXFS", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "Demand."},
-    {"name": "Nonfarm payrolls", "id": "PAYEMS", "seed": "PAYEMS", "unit": "k", "rule": "diff > 150", "trans": "diff", "why": "Income driver."},
-    {"name": "Wage growth", "id": "CES0500000003", "seed": "CES0500000003", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "Inflation stickiness."},
-    {"name": "P/E ratios", "id": None, "seed": "pe_sp500", "unit": "x", "rule": "> 20", "why": "Valuation."},
-    {"name": "Credit growth", "id": "TOTBKCR", "seed": "TOTBKCR", "unit": "%", "rule": "yoy > 5", "trans": "yoy", "why": "Economic fuel."},
-    {"name": "Fed funds futures", "id": "FEDFUNDS", "seed": "FEDFUNDS", "unit": "%", "rule": "> 0.5", "why": "Rate expectations."},
-    {"name": "Short rates", "id": "TB3MS", "seed": "TB3MS", "unit": "%", "rule": "trend_up", "why": "Tightening."},
-    {"name": "Industrial production", "id": "INDPRO", "seed": "INDPRO", "unit": "%", "rule": "yoy > 2", "trans": "yoy", "why": "Manufacturing."},
-    {"name": "Consumer/Inv spending", "id": "PCE", "seed": "PCE", "unit": "%", "rule": "yoy > 0", "trans": "yoy", "why": "Recession check."},
-    {"name": "Productivity growth", "id": "OPHNFB", "seed": "OPHNFB", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "Real wealth."},
-    {"name": "Debt-to-GDP", "id": "GFDEGDQ188S", "seed": "GFDEGDQ188S", "unit": "%", "rule": "< 60", "why": "Solvency."},
-    {"name": "Real rates", "id": "REAINTRATREARAT10Y", "seed": "REAINTRATREARAT10Y", "unit": "%", "rule": "< -1", "why": "Restrictiveness."},
-    {"name": "Credit spreads", "id": "BAMLH0A0HYM2", "seed": "BAMLH0A0HYM2", "unit": "bps", "rule": "> 500", "why": "Fear metric."},
-    {"name": "M2 Money Supply", "id": "M2SL", "seed": "M2SL", "unit": "%", "rule": "yoy > 10", "trans": "yoy", "why": "Liquidity."},
-    {"name": "Fiscal deficits", "id": "FYFSD", "seed": "FYFSD", "unit": "%", "rule": "> 6", "why": "Govt borrowing."},
-    {"name": "Trade balance", "id": "BOPGSTB", "seed": "BOPGSTB", "unit": "B", "rule": "> 0", "why": "Global flows."},
+    {"name": "Yield curve", "id": "T10Y2Y", "seed": "T10Y2Y", "unit": "%", "rule": "> 1", "why": "10Y–2Y > 1% (steepens). Predicts recession."},
+    {"name": "Consumer confidence", "id": "UMCSENT", "seed": "UMCSENT", "unit": "Idx", "rule": "> 90", "why": "> 90 index (rising). Spending driver."},
+    {"name": "Building permits", "id": "PERMIT", "seed": "PERMIT", "unit": "k", "rule": "yoy > 5", "trans": "yoy", "why": "+5% YoY (increasing). Housing leads."},
+    {"name": "Unemployment claims", "id": "ICSA", "seed": "ICSA", "unit": "k", "rule": "yoy < -10", "trans": "yoy", "why": "−10% YoY (falling). Labor crack."},
+    {"name": "LEI (Conference Board)", "id": "USSLIND", "seed": "USSLIND", "unit": "Idx", "rule": "yoy > 1", "trans": "yoy", "why": "Up 1–2% (positive). Turning points."},
+    {"name": "GDP", "id": "A191RL1Q225SBEA", "seed": "GDP", "unit": "%", "rule": "> 2", "why": "2–4% YoY (rising). Economic health."},
+    {"name": "Capacity utilization", "id": "TCU", "seed": "TCU", "unit": "%", "rule": "> 80", "why": "> 80% (high). Factory slack."},
+    {"name": "Inflation", "id": "CPIAUCSL", "seed": "CPIAUCSL", "unit": "%", "rule": "range 2 3", "trans": "yoy", "why": "2–3% (moderate). Purchasing power."},
+    {"name": "Retail sales", "id": "RSXFS", "seed": "RSXFS", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "+3–5% YoY (rising). Demand."},
+    {"name": "Nonfarm payrolls", "id": "PAYEMS", "seed": "PAYEMS", "unit": "k", "rule": "diff > 150", "trans": "diff", "why": "+150K/month (steady). Income engine."},
+    {"name": "Wage growth", "id": "CES0500000003", "seed": "CES0500000003", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "> 3% YoY (rising). Inflation stickiness."},
+    {"name": "P/E ratios", "id": None, "seed": "pe_sp500", "unit": "x", "rule": "> 20", "why": "20+ (high). Valuation."},
+    {"name": "Credit growth", "id": "TOTBKCR", "seed": "TOTBKCR", "unit": "%", "rule": "yoy > 5", "trans": "yoy", "why": "> 5% YoY (increasing). Economic fuel."},
+    {"name": "Fed funds futures", "id": "FEDFUNDS", "seed": "FEDFUNDS", "unit": "%", "rule": "> 0.5", "why": "Hikes implied +0.5%+. Expectations."},
+    {"name": "Short rates", "id": "TB3MS", "seed": "TB3MS", "unit": "%", "rule": "trend_up", "why": "Rising (tightening)."},
+    {"name": "Industrial production", "id": "INDPRO", "seed": "INDPRO", "unit": "%", "rule": "yoy > 2", "trans": "yoy", "why": "+2–5% YoY (increasing). Manufacturing."},
+    {"name": "Consumer/Inv spending", "id": "PCE", "seed": "PCE", "unit": "%", "rule": "yoy > 0", "trans": "yoy", "why": "Positive growth (high). Recession check."},
+    {"name": "Productivity growth", "id": "OPHNFB", "seed": "OPHNFB", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "> 3% YoY (rising). Real wealth."},
+    {"name": "Debt-to-GDP", "id": "GFDEGDQ188S", "seed": "GFDEGDQ188S", "unit": "%", "rule": "< 60", "why": "< 60% (low). Solvency."},
+    {"name": "Foreign reserves", "id": "TRESEGUSM052N", "seed": "TRESEGUSM052N", "unit": "%", "rule": "yoy > 10", "trans": "yoy", "why": "+10% YoY (increasing). Stability."},
+    {"name": "Real rates", "id": "REAINTRATREARAT10Y", "seed": "REAINTRATREARAT10Y", "unit": "%", "rule": "< -1", "why": "< −1% (falling). Restrictiveness."},
+    {"name": "Trade balance", "id": "BOPGSTB", "seed": "BOPGSTB", "unit": "B", "rule": "> 0", "why": "Surplus > 2% of GDP (improving). Global flows."},
+    {"name": "Asset prices > metrics", "id": None, "seed": "pe_sp500", "unit": "%", "rule": "> 20", "why": "P/E +20% (high vs. fundamentals). Bubble check."},
+    {"name": "Market participation", "id": None, "seed": "margin_finra", "unit": "%", "rule": "yoy > 15", "trans": "yoy", "why": "+15% (increasing). Retail mania."},
+    {"name": "Wealth gaps", "id": "SIPOVGINIUSA", "seed": "SIPOVGINIUSA", "unit": "Gini", "rule": "> 0.45", "why": "Top 1% share +5% (widening). Fragility."},
+    {"name": "Credit spreads", "id": "BAMLH0A0HYM2", "seed": "BAMLH0A0HYM2", "unit": "bps", "rule": "> 500", "why": "> 500 bps (widening). Fear metric."},
+    {"name": "Central bank printing (M2)", "id": "M2SL", "seed": "M2SL", "unit": "%", "rule": "yoy > 10", "trans": "yoy", "why": "+10% YoY (printing). Liquidity."},
+    {"name": "Currency devaluation", "id": "DTWEXBGS", "seed": "DTWEXBGS", "unit": "%", "rule": "diff < -10", "trans": "diff", "why": "−10% to −20% (devaluation). Purchasing power."},
+    {"name": "Fiscal deficits", "id": "FYFSD", "seed": "FYFSD", "unit": "%", "rule": "> 6", "why": "> 6% of GDP (high). Borrowing."},
+    {"name": "Debt growth", "id": "GFDEBTN", "seed": "GFDEBTN", "unit": "%", "rule": "yoy > 5", "trans": "yoy", "why": "+5–10% gap above income growth."},
+    {"name": "Income growth", "id": "A067RO1Q156NBEA", "seed": "A067RO1Q156NBEA", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "Debt–income growth gap < 5%."},
+    {"name": "Debt service", "id": "TDSP", "seed": "TDSP", "unit": "%", "rule": "> 20", "why": "> 20% of incomes (high). Burden."},
+    {"name": "Education investment", "id": None, "seed": "pisa_math_usa", "unit": "%", "rule": "trend_up", "why": "+5% of budget YoY (surge). Future growth."},
+    {"name": "R&D patents", "id": None, "seed": "innovation_index", "unit": "Count", "rule": "yoy > 10", "why": "+10% YoY (rising). Innovation."},
+    {"name": "Competitiveness", "id": None, "seed": "competitiveness", "unit": "Rank", "rule": "trend_up", "why": "+5 ranks (improving). Efficiency."},
+    {"name": "GDP per capita growth", "id": "A939RX0Q048SBEA", "seed": "A939RX0Q048SBEA", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "+3% YoY (accelerating). Standard of living."},
+    {"name": "Trade share", "id": None, "seed": "trade_share", "unit": "%", "rule": "diff > 2", "why": "+2% of global share (expanding). Dominance."},
+    {"name": "Military spending", "id": "A063RC1Q027SBEA", "seed": "A063RC1Q027SBEA", "unit": "%", "rule": "> 4", "why": "> 4% of GDP (peaking). War cycle."},
+    {"name": "Internal conflicts", "id": None, "seed": "ucdp_battle_deaths", "unit": "Idx", "rule": "trend_up", "why": "Protests +20% (rising). Stability."},
+    {"name": "Reserve currency usage", "id": None, "seed": "usd_reserve_share", "unit": "%", "rule": "diff < -5", "why": "−5% of global share (dropping). Trust."},
+    {"name": "Military losses", "id": None, "seed": "ucdp_battle_deaths", "unit": "Count", "rule": "trend_up", "why": "Defeats +1/year (increasing). Power projection."},
+    {"name": "Economic output share", "id": None, "seed": "gdp_share_global", "unit": "%", "rule": "diff < -2", "why": "−2% of global share (falling). Relative power."},
+    {"name": "Corruption index", "id": None, "seed": "corruption_index", "unit": "Idx", "rule": "diff < -10", "why": "−10 points (worsening). Institutional rot."},
+    {"name": "Working population", "id": "LFWA64TTUSM647S", "seed": "LFWA64TTUSM647S", "unit": "%", "rule": "yoy < -1", "trans": "yoy", "why": "−1% YoY (aging). Demographics."},
+    {"name": "Education (PISA)", "id": None, "seed": "pisa_math_usa", "unit": "Score", "rule": "> 500", "why": "> 500 (top). Human capital."},
+    {"name": "Innovation", "id": None, "seed": "innovation_index", "unit": "Idx", "rule": "trend_up", "why": "Patents > 20% of global (high). Tech lead."},
+    {"name": "GDP share", "id": None, "seed": "gdp_share_global", "unit": "%", "rule": "trend_up", "why": "+2% of global share (growing)."},
+    {"name": "Trade dominance", "id": None, "seed": "trade_share", "unit": "%", "rule": "> 15", "why": "> 15% of global trade (dominance)."},
+    {"name": "Power index (CINC)", "id": None, "seed": "cinc_usa", "unit": "Idx", "rule": "> 0.15", "why": "Composite 8–10/10 (max). Hard power."},
+    {"name": "Debt burden", "id": "GFDEBTN", "seed": "GFDEBTN", "unit": "%", "rule": "> 100", "why": "> 100% of GDP (high)."},
 ]
 
-# --- CALCULATIONS ---
-# 1. MARGIN DEBT (Fixed Math)
+# --- CALCULATIONS (FIXED & POLISHED) ---
+# 1. MARGIN DEBT
 m_df = SEEDS["margin_finra"]; g_df = SEEDS["gdp_nominal"]
-# Margin is in Millions (e.g. 800,000), GDP in Billions (e.g. 28,500).
-# Convert Margin to Billions: 800,000 / 1000 = 800B.
-# Ratio: (800 / 28500) * 100
 margin_val = m_df.iloc[-1,-1]
 gdp_val = g_df.iloc[-1,-1]
 margin_pct = (margin_val / 1000 / gdp_val) * 100 
@@ -180,8 +203,6 @@ with t_core:
     rows = []
     for item in CORE_MAP:
         cur, prev, _ = get_metric(item["id"], item["seed"], item.get("trans", "none"))
-        # Determine Check/Warning based on Threshold
-        met = False # Logic placeholder
         rows.append({
             "Indicator": item["name"],
             "Threshold": item["rule"],
@@ -199,7 +220,6 @@ with t_short:
 
     st.subheader("FINAL TOP KILL COMBO (10/10 = sell 80-90% this week)")
     
-    # Added Columns: Threshold, Why
     short_data = [
         {"#": 1, "Signal": "Margin Debt % GDP", "Value": fmt(margin_pct), "Threshold": "≥3.5% & falling", "Status": "🔴 KILL" if kill_1 else "⚪", "Why": "Leverage collapse."},
         {"#": 2, "Signal": "Real Fed Funds", "Value": fmt(real_ff), "Threshold": "≥+1.5%", "Status": "🔴 KILL" if kill_2 else "⚪", "Why": "Tight money pops bubbles."},
@@ -237,7 +257,6 @@ with t_long:
     st.subheader("SUPER-CYCLE POINT OF NO RETURN")
     st.info("Tracking 11 Dark-Red Signals + 3 Manual Triggers")
     
-    # Restored ALL 11 ROWS + Added Threshold/Why columns
     long_data = [
         {"#": 1, "Signal": "Total Debt/GDP", "Value": fmt(td), "Threshold": ">400%", "Status": "🔴 DARK" if dark_1 else "⚪", "Why": "Math certainty of default/reset."},
         {"#": 2, "Signal": "Gold ATH vs Majors", "Value": "Yes", "Threshold": "All Majors", "Status": "🔴 DARK" if dark_2 else "⚪", "Why": "Fiat confidence collapse."},
