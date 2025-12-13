@@ -1,273 +1,379 @@
-from __future__ import annotations
-import streamlit as st
-import pandas as pd
-from fredapi import Fred
-from seeds import SEEDS
+import React, { useState, useEffect, useMemo } from 'react';
+import { Activity, Zap, ShieldAlert, BarChart3, Database, RefreshCw, AlertTriangle, ArrowDown, TrendingDown } from 'lucide-react';
+import { clsx } from 'clsx';
+import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 
-# --- CONFIG ---
-st.set_page_config(page_title="Econ Mirror", layout="wide", page_icon="🌍")
-try:
-    FRED_KEY = st.secrets["FRED_API_KEY"]
-except:
-    FRED_KEY = ""
+import { CORE_INDICATORS, SHORT_TERM_INDICATORS, LONG_TERM_INDICATORS } from './constants';
+import { fetchFredSeries, fetchFmpQuote, transformData } from './services/dataService';
+import { IndicatorConfig, IndicatorData } from './types';
 
-# --- ENGINE ---
-@st.cache_data(ttl=1800)
-def get_metric(fred_id=None, seed_key=None, transform="none"):
-    s = pd.Series(dtype=float)
-    # 1. Try Live
-    if fred_id and FRED_KEY:
-        try:
-            fred = Fred(api_key=FRED_KEY)
-            s = fred.get_series(fred_id)
-        except: pass
-    # 2. Try Seed
-    if s.empty and seed_key in SEEDS:
-        df = SEEDS[seed_key]
-        if not df.empty:
-            s = pd.Series(df.iloc[:,-1].values, index=pd.to_datetime(df["date"]))
-    if s.empty: return None, None, []
-    
-    # 3. Transform
-    try:
-        if transform == "yoy": s_trans = s.pct_change(12) * 100
-        elif transform == "diff": s_trans = s.diff()
-        else: s_trans = s
-        return s_trans.iloc[-1], (s_trans.iloc[-2] if len(s_trans) > 1 else s_trans.iloc[-1]), s_trans.tail(24).tolist()
-    except: return None, None, []
+// --- Helper Components ---
 
-def fmt(val, unit="%"):
-    if val is None: return "-"
-    return f"{val:,.2f}{unit}" if unit else f"{val:,.2f}"
+const StatusCard = ({ title, count, max, type, isActive }: { title: string, count: number, max: number, type: 'kill' | 'dark', isActive: boolean }) => {
+  const ratio = count / max;
+  const isRed = ratio > 0.6; // Threshold for visual alarm
+  return (
+    <div className={clsx(
+      "p-6 rounded-xl border transition-all duration-300 relative overflow-hidden",
+      isActive ? "ring-2 ring-blue-500 bg-slate-800" : "bg-slate-900",
+      isRed ? "border-red-500/50 shadow-[0_0_30px_rgba(220,38,38,0.2)]" : "border-slate-700"
+    )}>
+      {isRed && <div className="absolute inset-0 bg-red-500/5 animate-pulse pointer-events-none" />}
+      <div className="flex justify-between items-start mb-2 relative z-10">
+        <h3 className="text-slate-400 text-sm font-semibold uppercase tracking-wider">{title}</h3>
+        {type === 'kill' ? <Zap className={isRed ? "text-red-500" : "text-slate-500"} size={20} /> : <ShieldAlert className={isRed ? "text-red-900" : "text-slate-500"} size={20} />}
+      </div>
+      <div className="flex items-baseline gap-2 relative z-10">
+        <span className={clsx("text-4xl font-bold", isRed ? "text-red-500" : "text-slate-200")}>{count}</span>
+        <span className="text-slate-500 font-medium">/ {max} Signals</span>
+      </div>
+      <div className="mt-4 h-2 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
+        <div 
+          className={clsx("h-full transition-all duration-1000", isRed ? "bg-red-600" : "bg-blue-500")} 
+          style={{ width: `${Math.min((count / max) * 100, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
-# --- INDICATOR MAP (FULL 50+ LIST) ---
-CORE_MAP = [
-    {"name": "Yield curve", "id": "T10Y2Y", "seed": "T10Y2Y", "unit": "%", "rule": "> 1", "why": "10Y–2Y > 1% (steepens). Predicts recession."},
-    {"name": "Consumer confidence", "id": "UMCSENT", "seed": "UMCSENT", "unit": "Idx", "rule": "> 90", "why": "> 90 index (rising). Spending driver."},
-    {"name": "Building permits", "id": "PERMIT", "seed": "PERMIT", "unit": "k", "rule": "yoy > 5", "trans": "yoy", "why": "+5% YoY (increasing). Housing leads."},
-    {"name": "Unemployment claims", "id": "ICSA", "seed": "ICSA", "unit": "k", "rule": "yoy < -10", "trans": "yoy", "why": "−10% YoY (falling). Labor crack."},
-    {"name": "LEI (Conference Board)", "id": "USSLIND", "seed": "USSLIND", "unit": "Idx", "rule": "yoy > 1", "trans": "yoy", "why": "Up 1–2% (positive). Turning points."},
-    {"name": "GDP", "id": "A191RL1Q225SBEA", "seed": "GDP", "unit": "%", "rule": "> 2", "why": "2–4% YoY (rising). Economic health."},
-    {"name": "Capacity utilization", "id": "TCU", "seed": "TCU", "unit": "%", "rule": "> 80", "why": "> 80% (high). Factory slack."},
-    {"name": "Inflation", "id": "CPIAUCSL", "seed": "CPIAUCSL", "unit": "%", "rule": "range 2 3", "trans": "yoy", "why": "2–3% (moderate). Purchasing power."},
-    {"name": "Retail sales", "id": "RSXFS", "seed": "RSXFS", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "+3–5% YoY (rising). Demand."},
-    {"name": "Nonfarm payrolls", "id": "PAYEMS", "seed": "PAYEMS", "unit": "k", "rule": "diff > 150", "trans": "diff", "why": "+150K/month (steady). Income engine."},
-    {"name": "Wage growth", "id": "CES0500000003", "seed": "CES0500000003", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "> 3% YoY (rising). Inflation stickiness."},
-    {"name": "P/E ratios", "id": None, "seed": "pe_sp500", "unit": "x", "rule": "> 20", "why": "20+ (high). Valuation."},
-    {"name": "Credit growth", "id": "TOTBKCR", "seed": "TOTBKCR", "unit": "%", "rule": "yoy > 5", "trans": "yoy", "why": "> 5% YoY (increasing). Economic fuel."},
-    {"name": "Fed funds futures", "id": "FEDFUNDS", "seed": "FEDFUNDS", "unit": "%", "rule": "> 0.5", "why": "Hikes implied +0.5%+. Expectations."},
-    {"name": "Short rates", "id": "TB3MS", "seed": "TB3MS", "unit": "%", "rule": "trend_up", "why": "Rising (tightening)."},
-    {"name": "Industrial production", "id": "INDPRO", "seed": "INDPRO", "unit": "%", "rule": "yoy > 2", "trans": "yoy", "why": "+2–5% YoY (increasing). Manufacturing."},
-    {"name": "Consumer/Inv spending", "id": "PCE", "seed": "PCE", "unit": "%", "rule": "yoy > 0", "trans": "yoy", "why": "Positive growth (high). Recession check."},
-    {"name": "Productivity growth", "id": "OPHNFB", "seed": "OPHNFB", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "> 3% YoY (rising). Real wealth."},
-    {"name": "Debt-to-GDP", "id": "GFDEGDQ188S", "seed": "GFDEGDQ188S", "unit": "%", "rule": "< 60", "why": "< 60% (low). Solvency."},
-    {"name": "Foreign reserves", "id": "TRESEGUSM052N", "seed": "TRESEGUSM052N", "unit": "%", "rule": "yoy > 10", "trans": "yoy", "why": "+10% YoY (increasing). Stability."},
-    {"name": "Real rates", "id": "REAINTRATREARAT10Y", "seed": "REAINTRATREARAT10Y", "unit": "%", "rule": "< -1", "why": "< −1% (falling). Restrictiveness."},
-    {"name": "Trade balance", "id": "BOPGSTB", "seed": "BOPGSTB", "unit": "B", "rule": "> 0", "why": "Surplus > 2% of GDP (improving). Global flows."},
-    {"name": "Asset prices > metrics", "id": None, "seed": "pe_sp500", "unit": "%", "rule": "> 20", "why": "P/E +20% (high vs. fundamentals). Bubble check."},
-    {"name": "Market participation", "id": None, "seed": "margin_finra", "unit": "%", "rule": "yoy > 15", "trans": "yoy", "why": "+15% (increasing). Retail mania."},
-    {"name": "Wealth gaps", "id": "SIPOVGINIUSA", "seed": "SIPOVGINIUSA", "unit": "Gini", "rule": "> 0.45", "why": "Top 1% share +5% (widening). Fragility."},
-    {"name": "Credit spreads", "id": "BAMLH0A0HYM2", "seed": "BAMLH0A0HYM2", "unit": "bps", "rule": "> 500", "why": "> 500 bps (widening). Fear metric."},
-    {"name": "Central bank printing (M2)", "id": "M2SL", "seed": "M2SL", "unit": "%", "rule": "yoy > 10", "trans": "yoy", "why": "+10% YoY (printing). Liquidity."},
-    {"name": "Currency devaluation", "id": "DTWEXBGS", "seed": "DTWEXBGS", "unit": "%", "rule": "diff < -10", "trans": "diff", "why": "−10% to −20% (devaluation). Purchasing power."},
-    {"name": "Fiscal deficits", "id": "FYFSD", "seed": "FYFSD", "unit": "%", "rule": "> 6", "why": "> 6% of GDP (high). Borrowing."},
-    {"name": "Debt growth", "id": "GFDEBTN", "seed": "GFDEBTN", "unit": "%", "rule": "yoy > 5", "trans": "yoy", "why": "+5–10% gap above income growth."},
-    {"name": "Income growth", "id": "A067RO1Q156NBEA", "seed": "A067RO1Q156NBEA", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "Debt–income growth gap < 5%."},
-    {"name": "Debt service", "id": "TDSP", "seed": "TDSP", "unit": "%", "rule": "> 20", "why": "> 20% of incomes (high). Burden."},
-    {"name": "Education investment", "id": None, "seed": "pisa_math_usa", "unit": "%", "rule": "trend_up", "why": "+5% of budget YoY (surge). Future growth."},
-    {"name": "R&D patents", "id": None, "seed": "innovation_index", "unit": "Count", "rule": "yoy > 10", "why": "+10% YoY (rising). Innovation."},
-    {"name": "Competitiveness", "id": None, "seed": "competitiveness", "unit": "Rank", "rule": "trend_up", "why": "+5 ranks (improving). Efficiency."},
-    {"name": "GDP per capita growth", "id": "A939RX0Q048SBEA", "seed": "A939RX0Q048SBEA", "unit": "%", "rule": "yoy > 3", "trans": "yoy", "why": "+3% YoY (accelerating). Standard of living."},
-    {"name": "Trade share", "id": None, "seed": "trade_share", "unit": "%", "rule": "diff > 2", "why": "+2% of global share (expanding). Dominance."},
-    {"name": "Military spending", "id": "A063RC1Q027SBEA", "seed": "A063RC1Q027SBEA", "unit": "%", "rule": "> 4", "why": "> 4% of GDP (peaking). War cycle."},
-    {"name": "Internal conflicts", "id": None, "seed": "ucdp_battle_deaths", "unit": "Idx", "rule": "trend_up", "why": "Protests +20% (rising). Stability."},
-    {"name": "Reserve currency usage", "id": None, "seed": "usd_reserve_share", "unit": "%", "rule": "diff < -5", "why": "−5% of global share (dropping). Trust."},
-    {"name": "Military losses", "id": None, "seed": "ucdp_battle_deaths", "unit": "Count", "rule": "trend_up", "why": "Defeats +1/year (increasing). Power projection."},
-    {"name": "Economic output share", "id": None, "seed": "gdp_share_global", "unit": "%", "rule": "diff < -2", "why": "−2% of global share (falling). Relative power."},
-    {"name": "Corruption index", "id": None, "seed": "corruption_index", "unit": "Idx", "rule": "diff < -10", "why": "−10 points (worsening). Institutional rot."},
-    {"name": "Working population", "id": "LFWA64TTUSM647S", "seed": "LFWA64TTUSM647S", "unit": "%", "rule": "yoy < -1", "trans": "yoy", "why": "−1% YoY (aging). Demographics."},
-    {"name": "Education (PISA)", "id": None, "seed": "pisa_math_usa", "unit": "Score", "rule": "> 500", "why": "> 500 (top). Human capital."},
-    {"name": "Innovation", "id": None, "seed": "innovation_index", "unit": "Idx", "rule": "trend_up", "why": "Patents > 20% of global (high). Tech lead."},
-    {"name": "GDP share", "id": None, "seed": "gdp_share_global", "unit": "%", "rule": "trend_up", "why": "+2% of global share (growing)."},
-    {"name": "Trade dominance", "id": None, "seed": "trade_share", "unit": "%", "rule": "> 15", "why": "> 15% of global trade (dominance)."},
-    {"name": "Power index (CINC)", "id": None, "seed": "cinc_usa", "unit": "Idx", "rule": "> 0.15", "why": "Composite 8–10/10 (max). Hard power."},
-    {"name": "Debt burden", "id": "GFDEBTN", "seed": "GFDEBTN", "unit": "%", "rule": "> 100", "why": "> 100% of GDP (high)."},
-]
+interface IndicatorRowProps {
+  config: IndicatorConfig;
+  data?: IndicatorData;
+  isTriggered?: boolean;
+}
 
-# --- CALCULATIONS (FIXED & POLISHED) ---
-# 1. MARGIN DEBT
-m_df = SEEDS["margin_finra"]; g_df = SEEDS["gdp_nominal"]
-margin_val = m_df.iloc[-1,-1]
-gdp_val = g_df.iloc[-1,-1]
-margin_pct = (margin_val / 1000 / gdp_val) * 100 
-margin_falling = margin_val < m_df.iloc[-2,-1]
-kill_1 = margin_pct >= 3.5 and margin_falling
+const IndicatorRow: React.FC<IndicatorRowProps> = ({ config, data, isTriggered }) => {
+  // data.history is [Oldest...Newest]
+  const chartData = data?.history.map((val, i) => ({ i, val })) || [];
+  
+  const statusColor = data?.status === 'error' ? 'text-yellow-500' : isTriggered ? 'text-red-500' : 'text-slate-200';
+  const rowBg = isTriggered ? 'bg-red-900/10' : 'hover:bg-slate-800/50';
 
-# 2. Real FF
-ff, _, _ = get_metric("FEDFUNDS", "FEDFUNDS"); cpi, _, _ = get_metric("CPIAUCSL", "CPIAUCSL", "yoy")
-real_ff = (ff - cpi) if ff is not None and cpi is not None else 0
-kill_2 = real_ff >= 1.5
+  return (
+    <div className={clsx("grid grid-cols-12 gap-4 p-4 border-b border-slate-800 transition-colors items-center", rowBg)}>
+      <div className="col-span-3">
+        <h4 className="font-bold text-slate-200 text-sm">{config.name}</h4>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase">{config.source}</span>
+          <span className="text-[10px] text-slate-500 truncate">{config.id || 'Man'}</span>
+        </div>
+      </div>
+      
+      <div className="col-span-2">
+        <div className={clsx("text-lg font-mono font-bold flex items-center gap-2", statusColor)}>
+          {data?.value !== undefined && data.value !== null ? 
+            <span>
+                {data.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="text-xs ml-1 text-slate-500">{config.unit}</span>
+            </span>
+            : <span className="animate-pulse">Loading...</span>}
+            {isTriggered && <AlertTriangle size={14} className="text-red-500" />}
+        </div>
+        <div className="text-xs text-slate-500">Target: {config.rule}</div>
+      </div>
 
-# 3. Put/Call
-pc, _, _ = get_metric(None, "cboe_putcall")
-kill_3 = pc < 0.65 if pc else False
+      <div className="col-span-2 h-10 w-full opacity-60">
+           {chartData.length > 1 && (
+             <ResponsiveContainer width="100%" height="100%">
+               <LineChart data={chartData}>
+                 <Line type="monotone" dataKey="val" stroke={isTriggered ? "#ef4444" : "#3b82f6"} strokeWidth={2} dot={false} isAnimationActive={false} />
+               </LineChart>
+             </ResponsiveContainer>
+           )}
+      </div>
 
-# 4. AAII
-bull = SEEDS["aaii_sentiment"].iloc[-1]["bull"]
-kill_4 = bull > 60
+      <div className="col-span-5 pl-4 border-l border-slate-800 flex items-center">
+        <p className="text-xs text-slate-400 italic">"{config.why}"</p>
+      </div>
+    </div>
+  );
+};
 
-# 5. PE
-pe, _, _ = get_metric(None, "pe_sp500")
-kill_5 = pe > 30 if pe else False
+// --- Main Application ---
 
-# 6. Insider
-insider, _, _ = get_metric(None, "insider_ratio")
-kill_6 = insider < 10 if insider else False
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'SHORT' | 'LONG' | 'CORE'>('SHORT');
+  const [dataMap, setDataMap] = useState<Record<string, IndicatorData>>({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [spxDrawdown, setSpxDrawdown] = useState<number>(-4.0); // Default/fallback
 
-# 7. HY Spreads
-hy, hy_prev, _ = get_metric("BAMLH0A0HYM2", "BAMLH0A0HYM2")
-kill_7 = (hy < 4.0) and (hy > hy_prev + 0.5) if hy else False
+  // --- Manual/Mock Inputs State ---
+  const [manualState, setManualState] = useState({
+    margin_falling: true, 
+    put_call: 0.55,
+    aaii_bulls: 65,
+    insider_ratio: 8,
+    sp500_above_200dma: 20,
+    gold_ath: true,
+    gpr_index: 310,
+    usd_reserve_share_change: -3,
+    reset_event: false,
+    pe_sp500: 32,
+    real_assets_basket: 160
+  });
 
-# 8. VIX
-vix, _, _ = get_metric(None, "vix")
-kill_8 = vix < 20 if vix else False
+  // --- Data Fetching Engine ---
+  useEffect(() => {
+    const fetchAll = async () => {
+      const allIndicators = [...SHORT_TERM_INDICATORS, ...LONG_TERM_INDICATORS, ...CORE_INDICATORS];
+      const newMap: Record<string, IndicatorData> = { ...dataMap };
+      
+      const requiredFredIds = ['FEDFUNDS', 'CPIAUCSL', 'T10Y2Y', 'DGS30', 'M2SL', 'BAMLH0A0HYM2', 'VIXCLS', 'SP500'];
 
-# 9. Breadth
-breadth, _, _ = get_metric(None, "sp500_above_200dma")
-kill_9 = breadth < 25 if breadth else False
+      // 1. Fetch FRED Data
+      const uniqueFredIds = Array.from(new Set(allIndicators.filter(i => i.source === 'FRED' || i.source === 'CALC').map(i => i.id).concat(requiredFredIds))).filter(Boolean) as string[];
+      
+      await Promise.all(uniqueFredIds.map(async (id) => {
+          try {
+              const raw = await fetchFredSeries(id);
+              newMap[id] = raw;
+          } catch (e) { console.error(`Failed ${id}`, e); }
+      }));
 
-# 10. Liquidity
-m2, _, _ = get_metric("M2SL", "M2SL", "yoy")
-sofr, _, _ = get_metric("SOFR", "SOFR")
-kill_10 = (m2 <= -5) or (sofr and ff and (sofr - ff > 0.5)) if m2 else False
+      // 2. Fetch FMP Data
+      const fmpIds = allIndicators.filter(i => i.source === 'FMP' && i.id).map(i => i.id!) || [];
+      await Promise.all(fmpIds.map(async (id) => {
+          try {
+             const raw = await fetchFmpQuote(id);
+             newMap[id] = raw;
+          } catch (e) { console.error(e); }
+      }));
 
-kill_count = sum([kill_1, kill_2, kill_3, kill_4, kill_5, kill_6, kill_7, kill_8, kill_9, kill_10])
+      // 3. Process Logic for Transformations
+      allIndicators.forEach(ind => {
+        if (ind.source === 'FRED' && ind.id && newMap[ind.id]) {
+            newMap[ind.id] = transformData(newMap[ind.id], ind.transform);
+        }
+      });
 
-# LONG TERM
-td, _, _ = get_metric(None, "total_debt_gdp_global")
-dark_1 = td > 400 if td else False
+      // 4. Manual/Calc Injection & S&P Drawdown Logic
+      const spx = newMap['SP500'];
+      if (spx && spx.history.length > 0) {
+          // Calculate All-Time High (or 52-week high from fetched set)
+          const currentPrice = spx.value || 0;
+          const maxPrice = Math.max(...spx.history);
+          if (maxPrice > 0) {
+              const dd = ((currentPrice - maxPrice) / maxPrice) * 100;
+              setSpxDrawdown(dd);
+          }
+      }
 
-up, _, _ = get_metric(None, "usd_gold_power")
-dark_3 = up < 0.10 if up else False
+      newMap['margin_debt'] = { value: manualState.margin_falling ? 3.6 : 3.0, prevValue: 3.5, history: [3.5, 3.6], lastUpdated: 'Manual', status: 'success' };
+      
+      const ff = newMap['FEDFUNDS']?.value;
+      const cpiRaw = await fetchFredSeries('CPIAUCSL');
+      const cpiYoy = transformData(cpiRaw, 'yoy').value;
 
-y30, _, _ = get_metric("DGS30", "DGS30")
-real_30 = (y30 - cpi) if y30 and cpi else 0
-dark_4 = abs(real_30) >= 5
+      if (ff !== undefined && ff !== null && cpiYoy !== undefined && cpiYoy !== null) {
+          const realFF = ff - cpiYoy;
+          newMap['real_ff'] = { value: realFF, prevValue: 0, history: [realFF], lastUpdated: 'Calc', status: 'success' };
+      }
 
-gpr, _, _ = get_metric(None, "gpr_index")
-dark_5 = gpr > 300 if gpr else False
+      const y30 = newMap['DGS30']?.value;
+      if (y30 !== undefined && cpiYoy !== undefined) {
+          newMap['real_30y'] = { value: y30 - cpiYoy, prevValue: 0, history: [y30 - cpiYoy], lastUpdated: 'Calc', status: 'success' };
+      }
 
-wage_share, _, _ = get_metric("LABSHPUSA156NRUG", "LABSHPUSA156NRUG")
-dark_7 = wage_share < 50 if wage_share else False
+      // Manual Projections
+      newMap['put_call'] = { value: manualState.put_call, prevValue: 0, history: [0.6, 0.55], lastUpdated: 'Manual', status: 'success' };
+      newMap['aaii_bulls'] = { value: manualState.aaii_bulls, prevValue: 0, history: [50, 65], lastUpdated: 'Manual', status: 'success' };
+      newMap['pe_sp500'] = { value: manualState.pe_sp500, prevValue: 0, history: [30, 32], lastUpdated: 'Manual', status: 'success' };
+      newMap['insider_ratio'] = { value: manualState.insider_ratio, prevValue: 0, history: [12, 8], lastUpdated: 'Manual', status: 'success' };
+      newMap['sp500_above_200dma'] = { value: manualState.sp500_above_200dma, prevValue: 0, history: [30, 20], lastUpdated: 'Manual', status: 'success' };
+      newMap['gold_ath'] = { value: manualState.gold_ath ? 1 : 0, prevValue: 0, history: [], lastUpdated: 'Manual', status: 'success' };
+      newMap['gpr_index'] = { value: manualState.gpr_index, prevValue: 0, history: [200, 310], lastUpdated: 'Manual', status: 'success' };
+      newMap['usd_reserve_share'] = { value: manualState.usd_reserve_share_change, prevValue: 0, history: [], lastUpdated: 'Manual', status: 'success' }; 
+      newMap['real_assets_basket'] = { value: manualState.real_assets_basket, prevValue: 0, history: [140, 160], lastUpdated: 'Manual', status: 'success' };
+      newMap['official_reset'] = { value: manualState.reset_event ? 1 : 0, prevValue: 0, history: [], lastUpdated: 'Manual', status: 'success' };
+      newMap['usd_gold_power'] = { value: 0.09, prevValue: 0.11, history: [0.11, 0.09], lastUpdated: 'Calc', status: 'success' }; 
 
-prod, _, _ = get_metric("OPHNFB", "OPHNFB", "yoy")
-dark_8 = prod < 0 if prod else False # Negative trend
+      setDataMap(newMap);
+      setLastRefreshed(new Date().toLocaleTimeString());
+    };
 
-res_share, res_prev, _ = get_metric(None, "usd_reserve_share")
-dark_9 = (res_share - res_prev) <= -2 if res_share else False
+    fetchAll();
+    const interval = setInterval(fetchAll, 60000 * 5); // 5 mins
+    return () => clearInterval(interval);
+  }, [refreshTrigger, manualState]);
 
-real_assets, _, _ = get_metric(None, "real_assets_basket")
-dark_10 = real_assets > 150 if real_assets else False
 
-# Mock status for manual/external ones to ensure 11 rows exist
-dark_2 = True # Gold ATH
-dark_6 = True # Inequality (Gini > 0.5)
-dark_11 = False # Official Reset Event
+  // --- Logic Engine: Evaluate Signals ---
+  const evaluatedSignals = useMemo(() => {
+    const checkSignal = (ind: IndicatorConfig): boolean => {
+        const data = dataMap[ind.id || ''];
+        if (!data || data.value === null) return false;
 
-dark_count = sum([dark_1, dark_2, dark_3, dark_4, dark_5, dark_6, dark_7, dark_8, dark_9, dark_10, dark_11])
-spx_drawdown = -4.0 # Mock
+        const val = data.value;
+        const rule = ind.rule.toLowerCase();
 
-# --- UI ---
-st.markdown("""
-<style>
-    .kill-box {background-color: #8b0000; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 25px;}
-    .regime-box {background-color: #1e1e1e; border: 1px solid #444; padding: 15px; text-align: center; border-radius: 8px;}
-</style>
-""", unsafe_allow_html=True)
+        try {
+            if (rule.includes('falling') && ind.id === 'margin_debt') return val >= 3.5; 
+            if (rule.includes('all majors')) return val === 1;
+            if (rule.includes('yes')) return val === 1;
+            
+            const numThreshold = parseFloat(rule.match(/-?[\d\.]+/)?.[0] || '0');
+            
+            if (rule.startsWith('>=')) return val >= numThreshold;
+            if (rule.startsWith('>')) return val > numThreshold;
+            if (rule.startsWith('<=')) return val <= numThreshold;
+            if (rule.startsWith('<')) return val < numThreshold;
+            
+            return false;
+        } catch (e) { return false; }
+    };
 
-st.markdown(f"""
-<div class="regime-box">
-    <b>Current regime:</b> Late-stage melt-up (short-term) inside late-stage debt super-cycle (long-term). <br>
-    Ride stocks with 20–30% cash + 30–40% gold/BTC permanent. <br>
-    <span style="color:#ff4444"><b>Kill: {kill_count}/10</b></span> | 
-    <span style="color:#880000"><b>Dark: {dark_count}/11</b></span> | 
-    <b>Drawdown: {spx_drawdown}%</b>
-</div>
-""", unsafe_allow_html=True)
+    let killScore = 0;
+    const shortTermResults = SHORT_TERM_INDICATORS.map(ind => {
+        const triggered = checkSignal(ind);
+        if (triggered) killScore++;
+        return { ...ind, triggered };
+    });
 
-st.title("ECON MIRROR")
+    let darkScore = 0;
+    const longTermResults = LONG_TERM_INDICATORS.map(ind => {
+        const triggered = checkSignal(ind);
+        if (triggered) darkScore++;
+        return { ...ind, triggered };
+    });
 
-t_core, t_short, t_long = st.tabs(["📊 Core (50+)", "⚡ Short-Term (Kill)", "🌍 Long-Term (Super-Cycle)"])
+    const coreResults = CORE_INDICATORS.map(ind => {
+        return { ...ind, triggered: false };
+    });
 
-with t_core:
-    rows = []
-    for item in CORE_MAP:
-        cur, prev, _ = get_metric(item["id"], item["seed"], item.get("trans", "none"))
-        rows.append({
-            "Indicator": item["name"],
-            "Threshold": item["rule"],
-            "Current": fmt(cur, item["unit"]),
-            "Previous": fmt(prev, item["unit"]),
-            "Unit": item["unit"],
-            "Signal": "✅" if cur is not None else "⚪",
-            "Source": "FRED/Seed"
-        })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    return { killScore, darkScore, shortTermResults, longTermResults, coreResults };
+  }, [dataMap]);
 
-with t_short:
-    if kill_count >= 7 and spx_drawdown >= -8.0:
-        st.markdown("""<div class="kill-box"><h1>7+ KILL SIGNALS + S&P WITHIN –8% OF ATH<br>→ SELL 80–90% STOCKS THIS WEEK</h1></div>""", unsafe_allow_html=True)
+  const activeList = useMemo(() => {
+    if (activeTab === 'SHORT') return evaluatedSignals.shortTermResults;
+    if (activeTab === 'LONG') return evaluatedSignals.longTermResults;
+    return evaluatedSignals.coreResults;
+  }, [activeTab, evaluatedSignals]);
 
-    st.subheader("FINAL TOP KILL COMBO (10/10 = sell 80-90% this week)")
-    
-    short_data = [
-        {"#": 1, "Signal": "Margin Debt % GDP", "Value": fmt(margin_pct), "Threshold": "≥3.5% & falling", "Status": "🔴 KILL" if kill_1 else "⚪", "Why": "Leverage collapse."},
-        {"#": 2, "Signal": "Real Fed Funds", "Value": fmt(real_ff), "Threshold": "≥+1.5%", "Status": "🔴 KILL" if kill_2 else "⚪", "Why": "Tight money pops bubbles."},
-        {"#": 3, "Signal": "Put/Call Ratio", "Value": fmt(pc, ""), "Threshold": "<0.65", "Status": "🔴 KILL" if kill_3 else "⚪", "Why": "Extreme complacency."},
-        {"#": 4, "Signal": "AAII Bulls", "Value": fmt(bull), "Threshold": ">60%", "Status": "🔴 KILL" if kill_4 else "⚪", "Why": "Retail euphoria."},
-        {"#": 5, "Signal": "S&P 500 P/E", "Value": fmt(pe, "x"), "Threshold": ">30x", "Status": "🔴 KILL" if kill_5 else "⚪", "Why": " priced for perfection."},
-        {"#": 6, "Signal": "Insider buying", "Value": fmt(insider), "Threshold": "<10%", "Status": "🔴 KILL" if kill_6 else "⚪", "Why": "Smart money exiting."},
-        {"#": 7, "Signal": "HY spreads", "Value": fmt(hy, "bps"), "Threshold": "<400bps & wide", "Status": "🔴 KILL" if kill_7 else "⚪", "Why": "Credit risk ignored."},
-        {"#": 8, "Signal": "VIX", "Value": fmt(vix, ""), "Threshold": "<20", "Status": "🔴 KILL" if kill_8 else "⚪", "Why": "Calm before storm."},
-        {"#": 9, "Signal": "S&P > 200dma", "Value": fmt(breadth), "Threshold": "<25%", "Status": "🔴 KILL" if kill_9 else "⚪", "Why": "Bad breadth."},
-        {"#": 10, "Signal": "Liquidity Dry-up", "Value": f"M2 {fmt(m2)}", "Threshold": "M2 < -5%", "Status": "🔴 KILL" if kill_10 else "⚪", "Why": "Fuel removed."},
-    ]
-    st.dataframe(pd.DataFrame(short_data), use_container_width=True, hide_index=True)
-    
-    st.markdown("""
-    **Moment A – THE TOP (the first time 7+ lights turn red)**  
-    This is when the bubble is peaking and the crack just starts.  
-    *Dashboard: 7+ reds appear while the market is still near all-time highs (or within –5% to –10%).*  
-    *My action: Sell stocks aggressively down to 10% → move everything new into cash + gold/BTC.*
-    
-    **Moment B – THE PANIC BOTTOM (6–18 months later)**  
-    *Dashboard lights often get even redder during the crash.*  
-    *My action: Deploy 70–100% of the cash I raised in Moment A → buy stocks/commodities/BTC hand-over-fist.*
-    """)
+  // Alert Logic
+  const showKillAlert = evaluatedSignals.killScore >= 7 && spxDrawdown >= -8.0;
 
-with t_long:
-    c1 = st.checkbox("Central banks aggressive net gold buying")
-    c2 = st.checkbox("G20/BRICS moving toward gold-linked/CBDC")
-    c3 = st.checkbox("US 10Y Yield > 7% and CPI > 4%")
-    no_return_count = sum([c1, c2, c3])
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-lg border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/20">
+              <Activity className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent tracking-tight">ECON MIRROR</h1>
+              <p className="text-[10px] text-slate-500 font-mono tracking-[0.2em] uppercase">Macro Cycle Dashboard</p>
+            </div>
+          </div>
+          <div className="flex gap-4 text-xs font-mono items-center">
+            <div className="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 flex items-center gap-2 shadow-inner">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              LIVE
+            </div>
+            <div className="text-slate-600 hidden sm:block">Updated: {lastRefreshed}</div>
+            <button onClick={() => setRefreshTrigger(p => p+1)} className="p-2 hover:bg-slate-800 rounded-full text-blue-400">
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </div>
+      </header>
 
-    if dark_count >= 8 and no_return_count >= 2:
-        st.markdown("""<div class="kill-box"><h1>8+ DARK RED + 2 NO-RETURN<br>→ 80–100% HARD ASSETS FOR 5–15 YEARS</h1></div>""", unsafe_allow_html=True)
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        
+        {/* Status Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+           {/* Regime Box */}
+           <div className="md:col-span-3 bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-xl p-6 relative overflow-hidden group">
+              <div className="absolute -right-10 -top-10 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Database size={150} />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Status</span>
+                    <h2 className="text-lg font-bold text-white">Current Regime Analysis</h2>
+                </div>
+                <p className="text-slate-400 max-w-3xl text-sm leading-relaxed">
+                  You are navigating a <strong className="text-slate-200">Late-stage melt-up</strong> inside a <strong className="text-slate-200">late-stage debt super-cycle</strong>.
+                  Protocol: Ride stocks with 20–30% cash + 30–40% gold/BTC permanent.
+                </p>
+              </div>
+           </div>
+           
+           <StatusCard title="Short-Term Kill Score" count={evaluatedSignals.killScore} max={10} type="kill" isActive={activeTab === 'SHORT'} />
+           <StatusCard title="Long-Term Dark Score" count={evaluatedSignals.darkScore} max={11} type="dark" isActive={activeTab === 'LONG'} />
+           
+           <div className="p-6 rounded-xl border border-slate-800 bg-slate-900 flex flex-col justify-center items-center relative overflow-hidden">
+              <div className="text-slate-500 text-xs font-bold uppercase mb-3 tracking-widest">S&P 500 Drawdown</div>
+              <div className={clsx("text-5xl font-bold tracking-tighter", spxDrawdown < -20 ? "text-red-500" : "text-green-400")}>
+                {spxDrawdown.toFixed(2)}%
+              </div>
+              <div className="text-xs text-slate-600 mt-2">from 52-Week High</div>
+              <div className={clsx("absolute inset-0 border-t-4", spxDrawdown < -20 ? "border-red-500/20" : "border-green-500/20")}></div>
+           </div>
+        </div>
 
-    st.subheader("SUPER-CYCLE POINT OF NO RETURN")
-    st.info("Tracking 11 Dark-Red Signals + 3 Manual Triggers")
-    
-    long_data = [
-        {"#": 1, "Signal": "Total Debt/GDP", "Value": fmt(td), "Threshold": ">400%", "Status": "🔴 DARK" if dark_1 else "⚪", "Why": "Math certainty of default/reset."},
-        {"#": 2, "Signal": "Gold ATH vs Majors", "Value": "Yes", "Threshold": "All Majors", "Status": "🔴 DARK" if dark_2 else "⚪", "Why": "Fiat confidence collapse."},
-        {"#": 3, "Signal": "USD/Gold Power", "Value": fmt(up, ""), "Threshold": "<0.10 oz", "Status": "🔴 DARK" if dark_3 else "⚪", "Why": "Dollar devaluation."},
-        {"#": 4, "Signal": "Real 30Y Extreme", "Value": fmt(real_30), "Threshold": "> +5% or < -5%", "Status": "🔴 DARK" if dark_4 else "⚪", "Why": "System breaks at extremes."},
-        {"#": 5, "Signal": "GPR Index", "Value": fmt(gpr, ""), "Threshold": ">300", "Status": "🔴 DARK" if dark_5 else "⚪", "Why": "War cycle."},
-        {"#": 6, "Signal": "Gini (Inequality)", "Value": "0.41", "Threshold": ">0.50", "Status": "🔴 DARK" if dark_6 else "⚪", "Why": "Social unrest."},
-        {"#": 7, "Signal": "Wage Share", "Value": fmt(wage_share), "Threshold": "<50%", "Status": "🔴 DARK" if dark_7 else "⚪", "Why": "Wealth concentration."},
-        {"#": 8, "Signal": "Productivity Trend", "Value": fmt(prod), "Threshold": "Negative", "Status": "🔴 DARK" if dark_8 else "⚪", "Why": "Stagnation = Default."},
-        {"#": 9, "Signal": "USD Reserve Share", "Value": fmt(res_share), "Threshold": "Drop > 2pp", "Status": "🔴 DARK" if dark_9 else "⚪", "Why": "Loss of privilege."},
-        {"#": 10, "Signal": "Real Assets Basket", "Value": fmt(real_assets, ""), "Threshold": ">150", "Status": "🔴 DARK" if dark_10 else "⚪", "Why": "Flight to safety."},
-        {"#": 11, "Signal": "Official Reset Event", "Value": "No", "Threshold": "Yes", "Status": "🔴 DARK" if dark_11 else "⚪", "Why": "New rules of the game."},
-    ]
-    st.dataframe(pd.DataFrame(long_data), use_container_width=True, hide_index=True)
+        {/* --- CRITICAL ALERT BANNER --- */}
+        {showKillAlert && activeTab === 'SHORT' && (
+             <div className="mb-8 bg-red-900 text-white p-8 rounded-2xl border-4 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.4)] animate-pulse flex flex-col items-center text-center">
+                 <div className="flex items-center gap-4 mb-4">
+                     <ShieldAlert size={48} className="text-white"/>
+                     <h2 className="text-4xl font-black tracking-tighter">SELL 80-90% STOCKS IMMEDIATELY</h2>
+                     <ShieldAlert size={48} className="text-white"/>
+                 </div>
+                 <p className="text-xl font-bold text-red-200">KILL SCORE ≥ 7 AND S&P WITHIN -8% OF ATH</p>
+                 <div className="mt-4 px-6 py-2 bg-white text-red-900 font-bold rounded-full uppercase tracking-widest text-sm">Execute Protocol A</div>
+             </div>
+        )}
+
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-slate-800 mb-6 gap-8">
+          <button onClick={() => setActiveTab('SHORT')} className={clsx("pb-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2", activeTab === 'SHORT' ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300")}>
+            <Zap size={16}/> SHORT-TERM KILL
+          </button>
+          <button onClick={() => setActiveTab('LONG')} className={clsx("pb-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2", activeTab === 'LONG' ? "border-red-500 text-red-400" : "border-transparent text-slate-500 hover:text-slate-300")}>
+             <ShieldAlert size={16}/> LONG-TERM CYCLE
+          </button>
+          <button onClick={() => setActiveTab('CORE')} className={clsx("pb-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2", activeTab === 'CORE' ? "border-green-500 text-green-400" : "border-transparent text-slate-500 hover:text-slate-300")}>
+             <BarChart3 size={16}/> CORE 50+
+          </button>
+        </div>
+
+        {/* Content Table */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+          <div className="grid grid-cols-12 gap-4 p-4 border-b border-slate-800 bg-slate-950/50 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <div className="col-span-3">Indicator Name</div>
+            <div className="col-span-2">Current / Trigger</div>
+            <div className="col-span-2">Trend (Latest)</div>
+            <div className="col-span-5 pl-4 border-l border-slate-800">Strategic Importance</div>
+          </div>
+          <div className="divide-y divide-slate-800/50">
+            {activeList.map((ind, idx) => (
+              <IndicatorRow key={idx} config={ind} data={dataMap[ind.id || '']} isTriggered={ind.triggered} />
+            ))}
+          </div>
+        </div>
+
+        {/* Action Box (Standard) */}
+        {!showKillAlert && (
+            <div className="mt-8 p-6 bg-slate-900/50 border border-slate-800 rounded-lg text-sm text-slate-400 flex items-start gap-4">
+            <div className="p-2 bg-slate-800 rounded text-slate-300"><Activity size={20}/></div>
+            <div>
+                {activeTab === 'SHORT' && (
+                    <div><h3 className="text-blue-400 font-bold mb-1 uppercase tracking-wider">Monitor Status</h3><p>Waiting for 7+ Kill Signals combined with Market Strength.</p></div>
+                )}
+                {activeTab === 'LONG' && (
+                    <div><h3 className="text-red-400 font-bold mb-1 uppercase tracking-wider">Point of No Return Protocol</h3><p>If <strong className="text-white">DARK SCORE ≥ 8/11</strong> AND <strong className="text-white">2 "No-Return" Triggers</strong> → <span className="text-red-400 font-bold bg-red-900/20 px-1 rounded">EXIT SYSTEM.</span></p></div>
+                )}
+                {activeTab === 'CORE' && (
+                    <div><h3 className="text-green-400 font-bold mb-1 uppercase tracking-wider">Core Monitor</h3><p>Monitor these 50+ signals for divergence.</p></div>
+                )}
+            </div>
+            </div>
+        )}
+      </main>
+    </div>
+  );
+}
