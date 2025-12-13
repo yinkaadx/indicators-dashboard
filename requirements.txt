@@ -1,8 +1,6 @@
-streamlit>=1.40.0
+streamlit
 pandas
-requests
+numpy
+yfinance
 fredapi
-alpha-vantage
-textblob
-rich<14.0.0
-markdown-it-py
+plotly
